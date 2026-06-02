@@ -92,8 +92,25 @@ python main.py audio --provider gemini --model gemini-2.5-flash
 - `main.py` — Ponto de entrada principal, processa argumentos de linha de comando
 - `ai_utils.py` — Interação com APIs de IA (OpenAI e Gemini), definição de prompts
 - `puzzle_solver.py` — Lógica específica para resolver CAPTCHA de slider/puzzle
+- `solve_logger.py` — Logger que registra cada interação da IA (prompts, respostas, resultados)
 - `requirements.txt` — Dependências do projeto
+- `logs/solve_log.json` — Registro detalhado de todas as tentativas de resolução
 - `successful_solves/` — GIFs de resoluções bem-sucedidas
+
+## Sistema de Logging
+
+O projeto registra automaticamente cada tentativa de resolução em `logs/solve_log.json`, incluindo:
+- Timestamp da tentativa
+- Tipo de CAPTCHA
+- Provider e modelo utilizado
+- Prompt enviado à IA
+- Resposta retornada pela IA
+- Resultado (sucesso/falha)
+
+Para ver um resumo das tentativas:
+```bash
+python -c "from solve_logger import get_summary; import json; print(json.dumps(get_summary(), indent=2, ensure_ascii=False))"
+```
 
 ## Referências
 
