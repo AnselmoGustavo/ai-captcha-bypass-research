@@ -112,6 +112,50 @@ Para ver um resumo das tentativas:
 python -c "from solve_logger import get_summary; import json; print(json.dumps(get_summary(), indent=2, ensure_ascii=False))"
 ```
 
+## Criando CAPTCHAs Próprios (Próximos Passos)
+
+É possível criar CAPTCHAs customizados para testar o bot em condições controladas. A ideia é servir um servidor web local que gera desafios com parâmetros ajustáveis.
+
+### Como funciona
+
+1. **Instalar Flask:**
+   ```bash
+   pip install flask pillow
+   ```
+
+2. **Criar um servidor local** (ex: `captcha_server.py`) que:
+   - Gera imagens de CAPTCHA de texto com distorção, ruído, rotação variáveis
+   - Gera puzzles de slider com posições aleatórias da peça
+   - Gera grades de imagens para seleção (estilo reCAPTCHA)
+   - Serve as páginas em `http://localhost:5000`
+
+3. **Apontar o bot para o servidor local** em vez do `2captcha.com/demo`
+
+### Variáveis que podem ser controladas
+
+| Variável | Tipo de CAPTCHA | Descrição |
+|----------|----------------|-----------|
+| Nível de ruído | Texto | Quantidade de linhas/pontos sobre o texto |
+| Rotação dos caracteres | Texto | Ângulo de inclinação de cada letra |
+| Sobreposição | Texto | Grau de junção entre caracteres |
+| Fonte/cor | Texto | Variação visual do texto |
+| Posição do slot | Puzzle | Onde a peça deve ser encaixada |
+| Formato da peça | Puzzle | Forma do recorte (quadrado, irregular) |
+| Quantidade de tiles | Seleção de imagens | Grade 3x3, 4x4, 5x5 |
+| Posição dos elementos | Todos | Mover botões, inputs, instruções de lugar |
+
+### Para testar autenticação procedural
+
+O servidor pode alterar dinamicamente entre requisições:
+- Posição do campo de input e botão de submit
+- Ordem e formato das instruções
+- Layout da grade de imagens
+- Estilo visual dos elementos (cores, tamanhos, espaçamentos)
+
+Isso permite comparar a taxa de sucesso do bot entre:
+- **Interface estática** (baseline) — elementos sempre no mesmo lugar
+- **Interface procedural** — elementos mudam a cada carregamento
+
 ## Referências
 
 - AYDIN, Y. **AI-powered CAPTCHA bypass: Automating CAPTCHA solving with GPT-4o and Gemini.** 2025. Disponível em: https://aydinnyunus.github.io/2025/12/08/ai-captcha-bypass/
