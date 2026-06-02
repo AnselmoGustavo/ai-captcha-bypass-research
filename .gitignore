@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Logs de resolução de CAPTCHA
+logs/
+
 # C extensions
 *.so
 

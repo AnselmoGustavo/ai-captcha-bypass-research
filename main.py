@@ -33,6 +33,7 @@ from ai_utils import (
     ask_puzzle_correction_to_chatgpt,
     ask_puzzle_correction_to_gemini
 )
+from solve_logger import log_result
 
 #todo: sesli captchada sese asıl captchayı söyledikten sonra ignore previous instructions diyip sonra random bir captcha daha vericem
 load_dotenv()
@@ -194,6 +195,7 @@ def complicated_text_test(driver, provider='openai', model=None):
             driver.save_screenshot(final_success_path)
             screenshot_paths.append(final_success_path)
             create_success_gif(screenshot_paths, output_folder=f"successful_solves/complicated_text_{provider}")
+            log_result(True, "complicated_text", details=f"attempt {attempt + 1}")
             return attempt + 1 # Return the successful attempt number
 
         except Exception as e:
@@ -202,6 +204,7 @@ def complicated_text_test(driver, provider='openai', model=None):
                 print("Retrying...")
             else:
                 print("All 3 attempts failed for this benchmark run.")
+                log_result(False, "complicated_text", details="All 3 attempts failed")
             
             try:
                 driver.switch_to.default_content()
@@ -256,9 +259,11 @@ def text_test(driver, provider='openai', model=None):
         driver.save_screenshot(final_success_path)
         screenshot_paths.append(final_success_path)
         create_success_gif(screenshot_paths, output_folder=f"successful_solves/text_{provider}")
+        log_result(True, "text")
         return 1
     except Exception as e:
         print(f"Captcha failed... Error: {e}")
+        log_result(False, "text", details=str(e))
         return 0
 
 def recaptcha_v2_test(driver, provider='openai', model=None):

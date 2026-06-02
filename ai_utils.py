@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI, APIStatusError
 from google import genai
 from google.genai import types
+from solve_logger import log_attempt
 
 load_dotenv()
 
@@ -235,7 +236,9 @@ def ask_text_to_gemini(image_path, model=None):
     with open(image_path, 'rb') as f: image_bytes = f.read()
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
-    return response.text.strip()
+    result = response.text.strip()
+    log_attempt("text", "gemini", model_to_use, prompt, result)
+    return result
 
 def ask_puzzle_distance_to_gemini(image_path, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -259,7 +262,9 @@ Analyze the image and determine the correct slider movement needed to solve the 
         model=model_to_use,
         contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt]
     )
-    return response.text
+    result = response.text
+    log_attempt("puzzle", "gemini", model_to_use, prompt[:200], result, extra={"step": "distance"})
+    return result
 
 def ask_puzzle_correction_to_gemini(image_path, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -280,7 +285,9 @@ Your task is to determine the final pixel adjustment required to **perfectly ali
         model=model_to_use,
         contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt]
     )
-    return response.text
+    result = response.text
+    log_attempt("puzzle", "gemini", model_to_use, prompt[:200], result, extra={"step": "correction"})
+    return result
 
 def ask_puzzle_correction_direction_to_gemini(image_path, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -342,7 +349,9 @@ def ask_recaptcha_instructions_to_gemini(image_path, model=None):
     with open(image_path, 'rb') as f: image_bytes = f.read()
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
-    return response.text.strip().lower()
+    result = response.text.strip().lower()
+    log_attempt("recaptcha_v2", "gemini", model_to_use, prompt.strip(), result, extra={"step": "instructions"})
+    return result
 
 def ask_if_tile_contains_object_gemini(image_path, object_name, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -350,4 +359,6 @@ def ask_if_tile_contains_object_gemini(image_path, object_name, model=None):
     with open(image_path, 'rb') as f: image_bytes = f.read()
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
-    return response.text.strip().lower() 
+    result = response.text.strip().lower()
+    log_attempt("recaptcha_v2", "gemini", model_to_use, prompt, result, extra={"step": "tile_check", "object": object_name})
+    return result
