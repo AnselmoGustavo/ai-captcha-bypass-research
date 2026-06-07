@@ -2,19 +2,24 @@
 Logger para registrar o comportamento da IA ao resolver CAPTCHAs.
 Salva em logs/solve_log.json cada tentativa com:
 - timestamp
+- session_id
 - tipo de CAPTCHA
 - provider/modelo usado
 - prompt enviado
 - resposta da IA
+- raciocínio da IA (2a chamada)
 - resultado (sucesso/falha)
 """
 
 import os
 import json
+import uuid
 from datetime import datetime
 
 LOG_DIR = "logs"
 LOG_FILE = os.path.join(LOG_DIR, "solve_log.json")
+
+_current_session = None
 
 
 def _ensure_log_file():
@@ -24,30 +29,134 @@ def _ensure_log_file():
             json.dump([], f)
 
 
-def log_attempt(captcha_type, provider, model, prompt, ai_response, success=None, extra=None):
+def start_session(captcha_type, provider, model, explain_reasoning=False):
+    """Inicia uma sessão de resolução e retorna o session_id."""
+    global _current_session
+    session_id = uuid.uuid4().hex[:8]
+    _current_session = {
+        "session_id": session_id,
+        "captcha_type": captcha_type,
+        "provider": provider,
+        "model": model or "default",
+        "started_at": datetime.now().isoformat(),
+        "explain_reasoning": explain_reasoning,
+    }
+    return session_id
+
+
+def is_reasoning_enabled():
+    return bool(_current_session and _current_session.get("explain_reasoning"))
+
+
+def get_current_session():
+    return _current_session
+
+
+def get_session_entries():
+    """Retorna entradas do log pertencentes à sessão atual."""
+    if not _current_session:
+        return []
+    session_id = _current_session["session_id"]
+    _ensure_log_file()
+    with open(LOG_FILE, "r", encoding="utf-8") as f:
+        logs = json.load(f)
+    return [entry for entry in logs if entry.get("session_id") == session_id]
+
+
+def _step_label(entry):
+    extra = entry.get("extra") or {}
+    step = extra.get("step")
+    labels = {
+        "distance": "Cálculo de distância do slider",
+        "correction": "Correção de alinhamento",
+        "direction": "Direção de correção",
+        "best_fit": "Seleção do melhor encaixe",
+        "instructions": "Identificação do objeto alvo",
+        "tile_check": "Verificação de tile",
+    }
+    if step in labels:
+        label = labels[step]
+        if step == "tile_check" and extra.get("object"):
+            label += f" ({extra['object']})"
+        return label
+    return entry.get("captcha_type", "passo")
+
+
+def finalize_session(success, details=None):
+    """Gera relatório Markdown da sessão (se --explain) e limpa o estado."""
+    global _current_session
+    if not _current_session:
+        return None
+
+    session = _current_session
+    if not session.get("explain_reasoning"):
+        _current_session = None
+        return None
+    entries = get_session_entries()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = os.path.join(
+        LOG_DIR,
+        f"reasoning_{timestamp}_{session['captcha_type']}.md",
+    )
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    status = "SUCESSO" if success else "FALHA"
+    lines = [
+        "# Relatório de Raciocínio da IA",
+        "",
+        f"- **Sessão:** {session['session_id']}",
+        f"- **Tipo:** {session['captcha_type']}",
+        f"- **Provider:** {session['provider']} / {session['model']}",
+        f"- **Início:** {session['started_at']}",
+        f"- **Resultado:** {status}",
+    ]
+    if details:
+        lines.append(f"- **Detalhes:** {details}")
+    lines.extend(["", "---", ""])
+
+    if not entries:
+        lines.append("_Nenhuma chamada à IA registrada nesta sessão._")
+    else:
+        for i, entry in enumerate(entries, 1):
+            lines.append(f"## Passo {i} — {_step_label(entry)}")
+            lines.append("")
+            lines.append(f"**Resposta da IA:** `{entry.get('ai_response', 'N/A')}`")
+            lines.append("")
+            reasoning = entry.get("reasoning")
+            if reasoning:
+                lines.append("**Raciocínio:**")
+                lines.append(reasoning)
+            else:
+                lines.append("_Raciocínio não disponível para este passo._")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    print(f"[LOG] Relatório de raciocínio salvo em {report_path}")
+    _current_session = None
+    return report_path
+
+
+def log_attempt(captcha_type, provider, model, prompt, ai_response, success=None, extra=None, reasoning=None):
     """
     Registra uma tentativa de resolução de CAPTCHA.
-
-    Args:
-        captcha_type: Tipo do CAPTCHA (text, puzzle, recaptcha_v2, etc.)
-        provider: Provider usado (openai, gemini)
-        model: Modelo específico (gpt-4o, gemini-2.5-flash, etc.)
-        prompt: O prompt enviado para a IA
-        ai_response: A resposta retornada pela IA
-        success: True/False/None se ainda não sabe
-        extra: Dict com informações adicionais (ex: correções, distância calculada)
     """
     _ensure_log_file()
 
     entry = {
+        "session_id": _current_session["session_id"] if _current_session else None,
         "timestamp": datetime.now().isoformat(),
         "captcha_type": captcha_type,
         "provider": provider,
         "model": model,
-        "prompt": prompt[:500] if prompt else None,  # Limita o tamanho do prompt no log
+        "prompt": prompt[:500] if prompt else None,
         "ai_response": str(ai_response),
+        "reasoning": reasoning,
         "success": success,
-        "extra": extra
+        "extra": extra,
     }
 
     with open(LOG_FILE, "r", encoding="utf-8") as f:
@@ -58,19 +167,31 @@ def log_attempt(captcha_type, provider, model, prompt, ai_response, success=None
     with open(LOG_FILE, "w", encoding="utf-8") as f:
         json.dump(logs, f, ensure_ascii=False, indent=2)
 
-    print(f"[LOG] {captcha_type} | {provider}/{model} | resposta: {ai_response[:80] if ai_response else 'N/A'}")
+    print(f"[LOG] {captcha_type} | {provider}/{model} | resposta: {str(ai_response)[:80] if ai_response else 'N/A'}")
 
 
 def log_result(success, captcha_type=None, details=None):
     """
-    Atualiza o último registro com o resultado final (sucesso ou falha).
+    Atualiza os registros da sessão atual com o resultado final.
     """
     _ensure_log_file()
 
     with open(LOG_FILE, "r", encoding="utf-8") as f:
         logs = json.load(f)
 
-    if logs:
+    session_id = _current_session["session_id"] if _current_session else None
+    updated = False
+    for entry in logs:
+        if session_id and entry.get("session_id") != session_id:
+            continue
+        entry["success"] = success
+        if details:
+            if entry.get("extra") is None:
+                entry["extra"] = {}
+            entry["extra"]["result_details"] = details
+        updated = True
+
+    if not updated and logs:
         logs[-1]["success"] = success
         if details:
             if logs[-1].get("extra") is None:
@@ -82,6 +203,41 @@ def log_result(success, captcha_type=None, details=None):
 
     status = "SUCESSO" if success else "FALHA"
     print(f"[LOG] Resultado: {status}")
+
+
+def get_latest_session_metadata():
+    """Retorna metadados da sessão mais recente em solve_log.json."""
+    _ensure_log_file()
+    with open(LOG_FILE, "r", encoding="utf-8") as f:
+        logs = json.load(f)
+    if not logs:
+        return {}
+
+    last_sid = logs[-1].get("session_id")
+    session_logs = [e for e in logs if e.get("session_id") == last_sid]
+    ai_response = None
+    ground_truth = None
+    variant = None
+    success = None
+
+    for entry in session_logs:
+        if entry.get("ai_response"):
+            ai_response = entry.get("ai_response")
+        details = (entry.get("extra") or {}).get("result_details")
+        if isinstance(details, dict):
+            ground_truth = details.get("ground_truth") or ground_truth
+            variant = details.get("variant") or variant
+            ai_response = details.get("ai_response") or ai_response
+        if entry.get("success") is not None:
+            success = entry.get("success")
+
+    return {
+        "session_id": last_sid,
+        "ai_response": ai_response,
+        "ground_truth": ground_truth,
+        "variant": variant,
+        "success": success,
+    }
 
 
 def get_summary():
@@ -112,5 +268,5 @@ def get_summary():
         "successes": successes,
         "failures": failures,
         "pending": pending,
-        "by_type": by_type
+        "by_type": by_type,
     }

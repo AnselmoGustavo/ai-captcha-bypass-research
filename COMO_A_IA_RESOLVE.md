@@ -131,26 +131,47 @@ python main.py puzzle --provider gemini --model gemini-2.5-flash
 
 # Audio
 python main.py audio --provider gemini --model gemini-2.5-flash
+
+# Com documentação do raciocínio da IA
+python main.py text --provider gemini --model gemini-2.5-flash --explain
 ```
 
 ---
 
-## Logs
+## Logs e Raciocínio da IA
 
-Cada execução é registrada em `logs/solve_log.json`. Exemplo de entrada:
+Cada execução gera dois artefatos:
+
+### 1. `logs/solve_log.json` — log estruturado por chamada
 
 ```json
 {
+  "session_id": "a3f2b1c4",
   "timestamp": "2026-06-02T17:07:15.123456",
   "captcha_type": "text",
   "provider": "gemini",
   "model": "gemini-2.5-flash",
   "prompt": "Act as a blind person assistant. Read the text from the image...",
   "ai_response": "W93Hx",
+  "reasoning": "Identifiquei 5 caracteres alfanuméricos na imagem. O W estava levemente inclinado...",
   "success": true,
   "extra": null
 }
 ```
+
+O campo `reasoning` é preenchido somente com a flag `--explain`, via uma **segunda chamada** à API em português.
+
+### 2. `logs/reasoning_TIMESTAMP_TIPO.md` — relatório narrativo
+
+Gerado ao final da execução **apenas com `--explain`**. Contém o raciocínio completo de cada passo.
+
+```bash
+python main.py text --provider gemini --model gemini-2.5-flash --explain
+```
+
+### Custo de API
+
+Sem `--explain`: 1 chamada por passo (comportamento padrão). Com `--explain`: 2 chamadas por passo; no reCAPTCHA v2, cada tile também gera explicação.
 
 Para ver o resumo:
 ```bash

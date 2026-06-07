@@ -1,11 +1,14 @@
 import argparse
+import json
 import os
+import sys
 import time
 import random
 import re
 import base64
 import urllib.request
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver import ActionChains
@@ -33,7 +36,7 @@ from ai_utils import (
     ask_puzzle_correction_to_chatgpt,
     ask_puzzle_correction_to_gemini
 )
-from solve_logger import log_result
+from solve_logger import log_result, start_session, finalize_session
 
 #todo: sesli captchada sese asıl captchayı söyledikten sonra ignore previous instructions diyip sonra random bir captcha daha vericem
 load_dotenv()
@@ -90,7 +93,7 @@ def create_success_gif(image_paths, output_folder="successful_solves"):
             duration=800,
             loop=0
         )
-        print(f"\n✨ Successfully saved solution GIF to {output_path}")
+        print(f"\nSuccessfully saved solution GIF to {output_path}")
     except Exception as e:
         print(f"\nCould not create success GIF. Error: {e}")
 
@@ -122,7 +125,8 @@ def audio_test(file_path='files/audio.mp3', provider='gemini', model=None):
     """Transcribes a local audio file using the specified AI provider."""
     if not os.path.exists(file_path):
         print(f"Error: Audio file not found at '{file_path}'")
-        return
+        log_result(False, "audio", details=f"Arquivo não encontrado: {file_path}")
+        return False
 
     try:
         print(f"Transcribing audio from '{file_path}' using {provider.upper()}...")
@@ -135,8 +139,12 @@ def audio_test(file_path='files/audio.mp3', provider='gemini', model=None):
         print("\n--- Transcription Result ---")
         print(transcription)
         print("--------------------------\n")
+        log_result(True, "audio", details=transcription)
+        return True
     except Exception as e:
         print(f"An error occurred during audio transcription: {e}")
+        log_result(False, "audio", details=str(e))
+        return False
 
 def complicated_text_test(driver, provider='openai', model=None):
     """
@@ -213,11 +221,113 @@ def complicated_text_test(driver, provider='openai', model=None):
 
     return 0
 
-def text_test(driver, provider='openai', model=None):
+def _local_server_base(url):
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _fetch_local_debug(url):
+    try:
+        base = _local_server_base(url)
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        seed = qs.get("seed", [None])[0]
+        if seed is not None:
+            with urllib.request.urlopen(f"{base}/api/answer_by_seed/{seed}", timeout=5) as resp:
+                data = json.loads(resp.read().decode())
+                return {"answer": data.get("answer"), "variant": data.get("variant")}
+        with urllib.request.urlopen(f"{base}/api/answer", timeout=5) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"[WARN] Não foi possível obter ground truth local: {e}")
+        return {}
+
+
+def _read_variant_from_page(driver):
+    try:
+        meta = driver.find_element(By.CSS_SELECTOR, 'meta[name="captcha-variant"]')
+        return json.loads(meta.get_attribute('content'))
+    except Exception:
+        return {}
+
+
+def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/text'):
+    """Resolve CAPTCHA de texto do servidor Flask local."""
+    driver.get(url)
+    captcha_image = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "captcha-image"))
+    )
+    WebDriverWait(driver, 10).until(
+        lambda d: d.execute_script(
+            "const img = document.getElementById('captcha-image'); return img && img.complete && img.naturalWidth > 0;"
+        )
+    )
+    time.sleep(1)
+    screenshot_paths = []
+    try:
+        captcha_screenshot_path = 'screenshots/text_captcha_local_1.png'
+        captcha_image.screenshot(captcha_screenshot_path)
+        screenshot_paths.append(captcha_screenshot_path)
+
+        if provider == 'openai':
+            response = ask_text_to_chatgpt(captcha_screenshot_path, model)
+        else:
+            response = ask_text_to_gemini(captcha_screenshot_path, model)
+
+        print(f"AI transcription: '{response}'")
+
+        input_field = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "captcha-input"))
+        )
+        input_field.clear()
+        input_field.send_keys(response)
+        submit_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "captcha-submit"))
+        )
+        submit_button.click()
+
+        WebDriverWait(driver, 10).until(
+            lambda d: d.find_element(By.ID, "captcha-result").get_attribute("data-visible") == "true"
+        )
+        success = driver.find_element(By.ID, "captcha-result").get_attribute("data-success") == "true"
+
+        debug = _fetch_local_debug(url)
+        variant = debug.get("variant") or _read_variant_from_page(driver)
+        ground_truth = debug.get("answer")
+        log_details = {
+            "variant": variant,
+            "ground_truth": ground_truth,
+            "ai_response": response,
+            "target": "local",
+            "url": url,
+        }
+
+        if success:
+            print("Captcha local passed successfully!")
+            final_success_path = f"screenshots/final_success_text_local_{datetime.now().strftime('%H%M%S')}.png"
+            driver.save_screenshot(final_success_path)
+            screenshot_paths.append(final_success_path)
+            create_success_gif(screenshot_paths, output_folder=f"successful_solves/text_local_{provider}")
+            log_result(True, "text", details=log_details)
+            return 1
+
+        print("Captcha local failed.")
+        log_result(False, "text", details=log_details)
+        return 0
+    except Exception as e:
+        print(f"Local captcha failed... Error: {e}")
+        log_result(False, "text", details={"target": "local", "url": url, "error": str(e)})
+        return 0
+
+
+def text_test(driver, provider='openai', model=None, target='2captcha', url=None):
     """
     Solves a single "Normal Text" captcha instance.
     Returns 1 for success, 0 for failure.
     """
+    if target == 'local':
+        return text_test_local(driver, provider, model, url or 'http://127.0.0.1:5000/text')
+
     driver.get("https://2captcha.com/demo/normal")
     time.sleep(5)
     screenshot_paths = []
@@ -375,6 +485,7 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
                     screenshot_paths.append(final_success_path)
                     
                     create_success_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}")
+                    log_result(True, "recaptcha_v2")
                     return 1
                 else:
                     # This case handles "check new images" - we just let the loop continue
@@ -389,6 +500,7 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
         else:
             # This 'else' belongs to the 'for' loop. Runs if the loop completes without a 'break'.
             print("Image challenge still present after max attempts.")
+            log_result(False, "recaptcha_v2", details="Max challenge attempts reached")
             return 0
 
         # --- Submit main page form ---
@@ -409,6 +521,7 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
         screenshot_paths.append(final_success_path)
         
         create_success_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}")
+        log_result(True, "recaptcha_v2")
         return 1
     
     except Exception as ex:
@@ -418,36 +531,58 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
             driver.switch_to.default_content()
         except Exception:
             pass
+        log_result(False, "recaptcha_v2", details=str(ex))
         return 0
 
 def main():
     parser = argparse.ArgumentParser(description="Test various captcha types.")
     parser.add_argument('captcha_type', choices=['puzzle', 'text', 'complicated_text', 'recaptcha_v2', 'audio'],
                         help="Specify the type of captcha to test")
-    parser.add_argument('--provider', choices=['openai', 'gemini'], default='openai', help="Specify the AI provider to use")
+    parser.add_argument('--provider', choices=['openai', 'gemini'], default='gemini', help="Specify the AI provider to use")
     parser.add_argument('--file', type=str, default='files/audio.mp3', help="Path to the local audio file for the 'audio' test.")
     parser.add_argument('--model', type=str, default=None, help="Specify the AI model to use (e.g., 'gpt-4o', 'gemini-2.5-flash').")
+    parser.add_argument('--explain', action='store_true', help="Documenta o raciocínio da IA (2a chamada à API + relatório Markdown)")
+    parser.add_argument('--target', choices=['2captcha', 'local'], default='2captcha',
+                        help="2captcha=demo online (padrão); local=servidor Flask")
+    parser.add_argument('--url', type=str, default='http://127.0.0.1:5000/text',
+                        help="URL do CAPTCHA local (com query params de variante)")
     args = parser.parse_args()
+
+    if args.target == 'local' and args.captcha_type != 'text':
+        print("Erro: --target local só suporta captcha_type=text no momento.")
+        sys.exit(1)
 
     os.makedirs('screenshots', exist_ok=True)
 
-    if args.captcha_type == 'audio':
-        # Audio test is now provider-aware
-        audio_test(args.file, args.provider, args.model)
-        return
+    start_session(args.captcha_type, args.provider, args.model, explain_reasoning=args.explain)
+    run_success = False
+    run_details = None
 
-    driver = webdriver.Firefox()
     try:
-        if args.captcha_type == 'puzzle':
-            solve_geetest_puzzle(driver, args.provider)
-        elif args.captcha_type == 'text':
-            text_test(driver, args.provider, args.model)
-        elif args.captcha_type == 'complicated_text':
-            complicated_text_test(driver, args.provider, args.model)
-        elif args.captcha_type == 'recaptcha_v2':
-            recaptcha_v2_test(driver, args.provider, args.model)
+        if args.captcha_type == 'audio':
+            run_success = audio_test(args.file, args.provider, args.model)
+        else:
+            driver = webdriver.Firefox()
+            try:
+                if args.captcha_type == 'puzzle':
+                    result = solve_geetest_puzzle(driver, args.provider)
+                    run_success = result == 1
+                elif args.captcha_type == 'text':
+                    result = text_test(driver, args.provider, args.model, args.target, args.url)
+                    run_success = result == 1
+                elif args.captcha_type == 'complicated_text':
+                    result = complicated_text_test(driver, args.provider, args.model)
+                    run_success = result > 0
+                    run_details = f"attempt {result}" if run_success else "All attempts failed"
+                elif args.captcha_type == 'recaptcha_v2':
+                    result = recaptcha_v2_test(driver, args.provider, args.model)
+                    run_success = result == 1
+            finally:
+                driver.quit()
     finally:
-        driver.quit()
+        finalize_session(run_success, run_details)
+
+    sys.exit(0 if run_success else 1)
 
 if __name__ == "__main__":
     main()

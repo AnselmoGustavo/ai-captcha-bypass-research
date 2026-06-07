@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="captcha-variant" content='{{ variant_json }}'>
+  <title>CAPTCHA de Texto — Laboratório Local</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    #captcha-image { display: block; margin: 1rem 0; border: 1px solid #ccc; max-width: 100%; }
+    #captcha-input { width: 100%; padding: 0.5rem; font-size: 1.1rem; box-sizing: border-box; }
+    #captcha-submit { margin-top: 0.75rem; padding: 0.5rem 1.5rem; font-size: 1rem; cursor: pointer; }
+    #captcha-result { margin-top: 1rem; padding: 0.75rem; border-radius: 4px; display: none; }
+    #captcha-result[data-visible="true"] { display: block; }
+    #captcha-result[data-success="true"] { background: #d4edda; color: #155724; }
+    #captcha-result[data-success="false"] { background: #f8d7da; color: #721c24; }
+    .params { font-size: 0.85rem; color: #555; background: #f8f8f8; padding: 0.5rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>CAPTCHA de Texto — Laboratório Local</h1>
+  <p class="params">Parâmetros: {{ variant_display }}</p>
+  <form id="captcha-form" method="post" action="/api/verify">
+    <img id="captcha-image" data-testid="captcha-image" src="/captcha-image.png" alt="">
+    <input type="text" id="captcha-input" data-testid="captcha-input" name="answer" placeholder="Digite o texto" autocomplete="off" required>
+    <button type="submit" id="captcha-submit" data-testid="captcha-submit">Verificar</button>
+  </form>
+  <div id="captcha-result" data-testid="captcha-result" data-success="false" data-visible="false"></div>
+  <script>
+    document.getElementById('captcha-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const answer = document.getElementById('captcha-input').value;
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer })
+      });
+      const data = await res.json();
+      const el = document.getElementById('captcha-result');
+      el.dataset.success = data.success ? 'true' : 'false';
+      el.dataset.visible = 'true';
+      el.textContent = data.success ? 'Correto!' : 'Incorreto. Tente novamente.';
+    });
+  </script>
+</body>
+</html>

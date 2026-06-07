@@ -1,0 +1,38 @@
+{
+  "baseline": {
+    "noise": 0,
+    "rotation": 0,
+    "overlap": 0,
+    "length": 5,
+    "font_size": 36,
+    "char_set": "alnum",
+    "wave": 0
+  },
+  "sweeps": [
+    {
+      "name": "noise_sweep",
+      "fixed": { "rotation": 0, "overlap": 0, "length": 5 },
+      "vary": "noise",
+      "values": [0, 1, 2, 3, 4, 5]
+    },
+    {
+      "name": "rotation_sweep",
+      "fixed": { "noise": 1, "overlap": 0, "length": 5 },
+      "vary": "rotation",
+      "values": [0, 10, 20, 30, 40]
+    },
+    {
+      "name": "overlap_sweep",
+      "fixed": { "noise": 1, "rotation": 10, "length": 5 },
+      "vary": "overlap",
+      "values": [0, 1, 2, 3]
+    },
+    {
+      "name": "length_sweep",
+      "fixed": { "noise": 1, "rotation": 0, "overlap": 0 },
+      "vary": "length",
+      "values": [4, 5, 6, 7, 8]
+    }
+  ],
+  "trials_per_variant": 5
+}

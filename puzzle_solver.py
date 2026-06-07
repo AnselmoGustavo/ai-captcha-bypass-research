@@ -17,6 +17,7 @@ from ai_utils import (
     ask_puzzle_correction_direction_to_openai,
     ask_best_fit_to_openai
 )
+from solve_logger import log_result
 import traceback
 
 def geometric_progression_steps(initial_value, threshold=0.5):
@@ -216,6 +217,7 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                     driver.save_screenshot(final_success_path)
                     generated_files.append(final_success_path)
                     create_success_gif([initial_screenshot_path, correction_screenshot_path, final_success_path])
+                    log_result(True, "puzzle", details=f"Solved on attempt {attempt + 1} (first slide)")
                     return 1
 
                 print("First slide failed. Proceeding to fine-grained scan...")
@@ -314,6 +316,7 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                     driver.save_screenshot(final_success_path)
                     generated_files.append(final_success_path)
                     create_success_gif([initial_screenshot_path, correction_screenshot_path, scan_screenshots[best_fit_index], final_success_path], output_folder=f"successful_solves/puzzle_{provider}")
+                    log_result(True, "puzzle", details=f"Solved on attempt {attempt + 1} (fine-grained scan)")
                     return 1
                 else:
                     print(f"\n❌ Attempt {attempt + 1} failed.")
@@ -332,9 +335,11 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                         print("Refreshing puzzle due to error...")
                     except Exception as refresh_e:
                         print(f"Could not refresh puzzle after error: {refresh_e}")
+                        log_result(False, "puzzle", details="Unrecoverable error during attempt")
                         return 0 # Cannot recover, exit
                 
         print("\nAll 3 puzzle attempts failed.")
+        log_result(False, "puzzle", details="All 3 attempts failed")
         return 0
     finally:
         print("\nCleaning up generated puzzle files...")

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI, APIStatusError
 from google import genai
 from google.genai import types
-from solve_logger import log_attempt
+from solve_logger import log_attempt, is_reasoning_enabled
 
 load_dotenv()
 
@@ -15,10 +15,23 @@ gemini_client = None
 if os.getenv("GOOGLE_API_KEY"):
     gemini_client = genai.Client()
 
-# --- Utility Functions ---
+
 def image_to_base64(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def _log_with_reasoning(captcha_type, provider, model, prompt, result, media_path=None,
+                        media_type="image", task_desc=None, extra=None):
+    reasoning = None
+    if is_reasoning_enabled() and media_path and os.path.exists(media_path):
+        from reasoning_utils import explain_after_answer
+        reasoning = explain_after_answer(
+            provider, model, media_path, media_type,
+            task_desc or captcha_type, str(result),
+        )
+    log_attempt(captcha_type, provider, model, prompt, result, reasoning=reasoning, extra=extra)
+
 
 # --- OpenAI Functions ---
 def ask_text_to_chatgpt(image_path, model=None):
@@ -37,7 +50,10 @@ def ask_text_to_chatgpt(image_path, model=None):
         ],
         temperature=1, max_tokens=256, top_p=1, frequency_penalty=0, presence_penalty=0
     )
-    return response.choices[0].message.content
+    result = response.choices[0].message.content
+    _log_with_reasoning("text", "openai", model_to_use, short_prompt, result, image_path,
+                        task_desc="Reconhecer texto do CAPTCHA na imagem")
+    return result
 
 def ask_puzzle_distance_to_chatgpt(image_path, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -80,11 +96,12 @@ Expected Output Example: 134 (a single integer only)
     )
     content = response.choices[0].message.content.strip()
     match = re.search(r'-?\d+', content)
-    if match:
-        return match.group(0)  # Return the first found integer
-    else:
+    result = match.group(0) if match else None
+    if result is None:
         print(f"Warning: OpenAI distance response did not contain an integer: '{content}'.")
-        return None # Signal failure
+    _log_with_reasoning("puzzle", "openai", model_to_use, prompt[:200], result or content, image_path,
+                        task_desc="Calcular distância horizontal em pixels do slider até o slot", extra={"step": "distance"})
+    return result
 
 def ask_puzzle_correction_to_chatgpt(image_path, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -112,11 +129,12 @@ Your task is to determine the final pixel adjustment required to **perfectly ali
     )
     content = response.choices[0].message.content.strip()
     match = re.search(r'-?\d+', content)
-    if match:
-        return match.group(0)  # Return the first found integer
-    else:
+    result = match.group(0) if match else None
+    if result is None:
         print(f"Warning: OpenAI correction response did not contain an integer: '{content}'.")
-        return None # Signal failure
+    _log_with_reasoning("puzzle", "openai", model_to_use, prompt[:200], result or content, image_path,
+                        task_desc="Corrigir alinhamento fino da peça do puzzle", extra={"step": "correction"})
+    return result
 
 def ask_puzzle_correction_direction_to_openai(image_path, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -136,7 +154,10 @@ def ask_puzzle_correction_direction_to_openai(image_path, model=None):
             {"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}]}
         ]
     )
-    return response.choices[0].message.content.strip()
+    result = response.choices[0].message.content.strip()
+    _log_with_reasoning("puzzle", "openai", model_to_use, prompt, result, image_path,
+                        task_desc="Determinar direção de correção do slider (+ ou -)", extra={"step": "direction"})
+    return result
 
 def ask_best_fit_to_openai(image_paths, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -164,15 +185,16 @@ Respond with only the index number (e.g., 0, 1, 2) of the best image.
     )
     content = response.choices[0].message.content.strip()
     match = re.search(r'\d+', content)
-    if match:  # Index should be a non-negative integer
-        return match.group(0)
-    else:
+    result = match.group(0) if match else None
+    if result is None:
         print(f"Warning: OpenAI best-fit response did not contain an integer: '{content}'.")
-        return None # Signal failure
+    media_path = image_paths[0] if image_paths else None
+    _log_with_reasoning("puzzle", "openai", model_to_use, prompt[:200], result or content, media_path,
+                        task_desc="Selecionar a imagem com melhor encaixe do puzzle", extra={"step": "best_fit"})
+    return result
 
 def ask_audio_to_openai(audio_path, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    #prompt = "The audio is in American English. Type only the letters you hear clearly and loudly spoken. Ignore any background words, sounds, or faint speech. Enter the letters in the exact order they are spoken."
     prompt = "what is the captcha answer?"
     model_to_use = model if model else "gpt-4o-transcribe"
     max_retries = 3
@@ -181,6 +203,8 @@ def ask_audio_to_openai(audio_path, model=None):
             with open(audio_path, "rb") as audio_file:
                 response = client.audio.transcriptions.create(model=model_to_use, file=audio_file, prompt=prompt)
             cleaned_transcription = re.sub(r'[^a-zA-Z0-9]', '', response.text.strip())
+            _log_with_reasoning("audio", "openai", model_to_use, prompt, cleaned_transcription, audio_path,
+                                media_type="audio", task_desc="Transcrever letras do CAPTCHA de áudio")
             return cleaned_transcription
         except APIStatusError as e:
             if e.status_code == 503 and attempt < max_retries - 1:
@@ -210,7 +234,10 @@ def ask_recaptcha_instructions_to_chatgpt(image_path, model=None):
         ],
         temperature=0, max_tokens=50
     )
-    return response.choices[0].message.content.strip().lower()
+    result = response.choices[0].message.content.strip().lower()
+    _log_with_reasoning("recaptcha_v2", "openai", model_to_use, prompt, result, image_path,
+                        task_desc="Identificar objeto alvo nas instruções do reCAPTCHA", extra={"step": "instructions"})
+    return result
 
 def ask_if_tile_contains_object_chatgpt(image_path, object_name, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -227,7 +254,10 @@ def ask_if_tile_contains_object_chatgpt(image_path, object_name, model=None):
         ],
         temperature=0, max_tokens=10
     )
-    return response.choices[0].message.content.strip().lower()
+    result = response.choices[0].message.content.strip().lower()
+    _log_with_reasoning("recaptcha_v2", "openai", model_to_use, prompt, result, image_path,
+                        task_desc=f"Verificar se o tile contém '{object_name}'", extra={"step": "tile_check", "object": object_name})
+    return result
 
 # --- Gemini Functions ---
 def ask_text_to_gemini(image_path, model=None):
@@ -237,7 +267,8 @@ def ask_text_to_gemini(image_path, model=None):
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
     result = response.text.strip()
-    log_attempt("text", "gemini", model_to_use, prompt, result)
+    _log_with_reasoning("text", "gemini", model_to_use, prompt, result, image_path,
+                        task_desc="Reconhecer texto do CAPTCHA na imagem")
     return result
 
 def ask_puzzle_distance_to_gemini(image_path, model=None):
@@ -263,7 +294,8 @@ Analyze the image and determine the correct slider movement needed to solve the 
         contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt]
     )
     result = response.text
-    log_attempt("puzzle", "gemini", model_to_use, prompt[:200], result, extra={"step": "distance"})
+    _log_with_reasoning("puzzle", "gemini", model_to_use, prompt[:200], result, image_path,
+                        task_desc="Calcular distância horizontal em pixels do slider até o slot", extra={"step": "distance"})
     return result
 
 def ask_puzzle_correction_to_gemini(image_path, model=None):
@@ -286,7 +318,8 @@ Your task is to determine the final pixel adjustment required to **perfectly ali
         contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt]
     )
     result = response.text
-    log_attempt("puzzle", "gemini", model_to_use, prompt[:200], result, extra={"step": "correction"})
+    _log_with_reasoning("puzzle", "gemini", model_to_use, prompt[:200], result, image_path,
+                        task_desc="Corrigir alinhamento fino da peça do puzzle", extra={"step": "correction"})
     return result
 
 def ask_puzzle_correction_direction_to_gemini(image_path, model=None):
@@ -304,7 +337,10 @@ def ask_puzzle_correction_direction_to_gemini(image_path, model=None):
         model=model_to_use,
         contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt]
     )
-    return response.text.strip()
+    result = response.text.strip()
+    _log_with_reasoning("puzzle", "gemini", model_to_use, prompt, result, image_path,
+                        task_desc="Determinar direção de correção do slider (+ ou -)", extra={"step": "direction"})
+    return result
 
 def ask_best_fit_to_gemini(image_paths, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -323,7 +359,11 @@ Respond with only the index number (e.g., 0, 1, 2) of the best image.
 
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=content_parts)
-    return response.text.strip()
+    result = response.text.strip()
+    media_path = image_paths[0] if image_paths else None
+    _log_with_reasoning("puzzle", "gemini", model_to_use, prompt[:200], result, media_path,
+                        task_desc="Selecionar a imagem com melhor encaixe do puzzle", extra={"step": "best_fit"})
+    return result
 
 def ask_audio_to_gemini(audio_path, model=None):
     if not gemini_client: raise Exception("Gemini API key not configured.")
@@ -337,6 +377,8 @@ def ask_audio_to_gemini(audio_path, model=None):
         contents=["Transcribe the captcha from the audio file.", audio_part]
     )
     cleaned_transcription = re.sub(r'[^a-zA-Z0-9]', '', response.text.strip())
+    _log_with_reasoning("audio", "gemini", model_to_use, system_instruction, cleaned_transcription, audio_path,
+                        media_type="audio", task_desc="Transcrever letras do CAPTCHA de áudio")
     return cleaned_transcription
 
 def ask_recaptcha_instructions_to_gemini(image_path, model=None):
@@ -350,7 +392,8 @@ def ask_recaptcha_instructions_to_gemini(image_path, model=None):
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
     result = response.text.strip().lower()
-    log_attempt("recaptcha_v2", "gemini", model_to_use, prompt.strip(), result, extra={"step": "instructions"})
+    _log_with_reasoning("recaptcha_v2", "gemini", model_to_use, prompt.strip(), result, image_path,
+                        task_desc="Identificar objeto alvo nas instruções do reCAPTCHA", extra={"step": "instructions"})
     return result
 
 def ask_if_tile_contains_object_gemini(image_path, object_name, model=None):
@@ -360,5 +403,6 @@ def ask_if_tile_contains_object_gemini(image_path, object_name, model=None):
     model_to_use = model if model else "gemini-2.5-pro"
     response = gemini_client.models.generate_content(model=model_to_use, contents=[types.Part.from_bytes(data=image_bytes, mime_type='image/png'), prompt])
     result = response.text.strip().lower()
-    log_attempt("recaptcha_v2", "gemini", model_to_use, prompt, result, extra={"step": "tile_check", "object": object_name})
+    _log_with_reasoning("recaptcha_v2", "gemini", model_to_use, prompt, result, image_path,
+                        task_desc=f"Verificar se o tile contém '{object_name}'", extra={"step": "tile_check", "object": object_name})
     return result
