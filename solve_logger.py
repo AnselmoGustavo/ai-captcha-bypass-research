@@ -29,8 +29,12 @@ def _ensure_log_file():
             json.dump([], f)
 
 
-def start_session(captcha_type, provider, model, explain_reasoning=False):
-    """Inicia uma sessão de resolução e retorna o session_id."""
+def start_session(captcha_type, provider, model, explicit_explain=False):
+    """Inicia uma sessão de resolução e retorna o session_id.
+
+    O raciocínio é sempre capturado (explain_reasoning=True).
+    O relatório Markdown só é escrito em falhas ou quando explicit_explain=True.
+    """
     global _current_session
     session_id = uuid.uuid4().hex[:8]
     _current_session = {
@@ -39,7 +43,8 @@ def start_session(captcha_type, provider, model, explain_reasoning=False):
         "provider": provider,
         "model": model or "default",
         "started_at": datetime.now().isoformat(),
-        "explain_reasoning": explain_reasoning,
+        "explain_reasoning": True,
+        "explicit_explain": explicit_explain,
     }
     return session_id
 
@@ -89,7 +94,8 @@ def finalize_session(success, details=None):
         return None
 
     session = _current_session
-    if not session.get("explain_reasoning"):
+    should_report = (not success) or session.get("explicit_explain", False)
+    if not should_report:
         _current_session = None
         return None
     entries = get_session_entries()

@@ -32,6 +32,12 @@
       "fixed": { "noise": 1, "rotation": 0, "overlap": 0 },
       "vary": "length",
       "values": [4, 5, 6, 7, 8]
+    },
+    {
+      "name": "occlusion_sweep",
+      "fixed": { "noise": 2, "rotation": 15, "overlap": 0, "length": 5 },
+      "vary": "occlusion",
+      "values": [0, 1, 2, 3, 4]
     }
   ],
   "trials_per_variant": 5

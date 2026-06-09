@@ -129,7 +129,8 @@ python main.py complicated_text --target local --url "http://127.0.0.1:5000/comp
 - `captcha_server.py` — Servidor Flask de CAPTCHAs customizados (rotas: `/text`, `/complicated_text`)
 - `captcha_generators/text_captcha.py` — Gera imagens de CAPTCHA com parâmetros variáveis; expõe `DEFAULT_VARIANT`, `COMPLICATED_DEFAULT_VARIANT`, `parse_variant`, `parse_variant_complicated`, `check`
 - `templates/text_captcha.html` — Página HTML com DOM estável para o bot (IDs: `captcha-image`, `captcha-input`, `captcha-submit`, `captcha-result`)
-- `run_experiments.py` — Roda bateria de testes automatizados
+- `run_tests.py` — Bateria completa por tipo de CAPTCHA (tabela de taxa de sucesso)
+- `run_experiments.py` — Sweep de um parâmetro por vez (`--captcha-type text|complicated_text`, `--sweep <nome>`)
 - `failure_report.py` — Relatório de taxa de falha por parâmetro
 - `experiments/text_variants.json` — Matriz de variantes para experimentos
 - `ai_utils.py` — Interação com APIs de IA (OpenAI e Gemini), definição de prompts
@@ -150,18 +151,22 @@ O projeto registra automaticamente cada tentativa de resolução em `logs/solve_
 - Provider e modelo utilizado
 - Prompt enviado à IA
 - Resposta retornada pela IA
+- Raciocínio da IA (capturado em todas as execuções)
 - Resultado (sucesso/falha)
-- **Raciocínio da IA** (somente com `--explain`)
 
-Com a flag `--explain`, cada passo gera uma 2ª chamada à API pedindo explicação em português, e ao final é criado `logs/reasoning_TIMESTAMP_TIPO.md`.
+### Raciocínio automático em falhas
 
-O projeto também salva GIFs de diagnóstico em `failed_solves/` quando a resolução falha, além dos GIFs de sucesso em `successful_solves/`.
+O raciocínio da IA é capturado em **toda** execução (segunda chamada à API por passo). O relatório `logs/reasoning_TIMESTAMP_TIPO.md` é gerado **automaticamente** sempre que o CAPTCHA falha — sem precisar de flags extras.
+
+A flag `--explain` força a geração do relatório também em casos de sucesso (útil para documentação acadêmica):
 
 ```bash
 python main.py text --provider gemini --model gemini-2.5-flash --explain
 ```
 
-> **Nota:** Com `--explain`, cada passo usa 2 chamadas à API. No reCAPTCHA v2, cada tile também gera uma explicação.
+> **Nota:** Cada passo usa 2 chamadas à API (resposta + raciocínio). No reCAPTCHA v2, cada tile também gera uma chamada de raciocínio.
+
+O projeto também salva GIFs de diagnóstico em `failed_solves/` quando a resolução falha, além dos GIFs de sucesso em `successful_solves/`.
 
 Para ver um resumo das tentativas:
 ```bash
@@ -210,16 +215,36 @@ python main.py text --target local --url "http://127.0.0.1:5000/text?noise=4&rot
 python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42" --provider gemini --model gemini-2.5-flash
 ```
 
-### 2. Rodar experimentos em lote
+### 2. Bateria completa de testes (`run_tests.py`)
 
-Com o servidor ativo, execute sweeps definidos em `experiments/text_variants.json`:
+Roda múltiplos tipos de CAPTCHA em sequência e exibe uma tabela de taxa de sucesso:
 
 ```bash
-# Todos os sweeps (noise, rotation, overlap, length)
-python run_experiments.py --start-server
+# Locais (text + complicated_text) — sobe servidor automaticamente
+python run_tests.py --start-server
 
-# Apenas variação de ruído, 3 tentativas por variante
-python run_experiments.py --start-server --sweep noise_sweep --trials 3
+# Escolher tipos e número de trials
+python run_tests.py --start-server --types text complicated_text --trials 5
+
+# Contra o 2captcha (sem servidor local)
+python run_tests.py --target 2captcha --types text recaptcha_v2 puzzle --trials 2
+```
+
+Resultados em `logs/tests/test_TIMESTAMP.json`.
+
+### 3. Sweeps por parâmetro (`run_experiments.py`)
+
+Varia um parâmetro de dificuldade por vez para medir o impacto na taxa de sucesso:
+
+```bash
+# Sweep de ruído no texto simples
+python run_experiments.py --start-server --sweep noise_sweep
+
+# Sweep de oclusão no texto distorcido (complicated_text)
+python run_experiments.py --start-server --captcha-type complicated_text --sweep occlusion_sweep --trials 3
+
+# Outros sweeps disponíveis: rotation_sweep, overlap_sweep, length_sweep
+python run_experiments.py --start-server --sweep rotation_sweep --trials 3
 ```
 
 O flag `--start-server` sobe o Flask automaticamente. Sem ele, rode `python captcha_server.py` em outro terminal antes.
@@ -240,7 +265,9 @@ O relatório lista as **variantes com menor taxa de sucesso**, indicando onde a 
 
 ### 4. Editar variantes de experimento
 
-Edite `experiments/text_variants.json` para adicionar novos sweeps:
+Sweeps disponíveis em `experiments/text_variants.json`: `noise_sweep`, `rotation_sweep`, `overlap_sweep`, `length_sweep`, `occlusion_sweep`.
+
+Adicione novos sweeps editando o arquivo:
 
 ```json
 {

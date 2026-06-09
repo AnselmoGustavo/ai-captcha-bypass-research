@@ -552,7 +552,7 @@ def main():
 
     os.makedirs('screenshots', exist_ok=True)
 
-    start_session(args.captcha_type, args.provider, args.model, explain_reasoning=args.explain)
+    start_session(args.captcha_type, args.provider, args.model, explicit_explain=args.explain)
     run_success = False
     run_details = None
 

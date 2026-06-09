@@ -23,7 +23,11 @@ from solve_logger import get_latest_session_metadata
 
 EXPERIMENTS_FILE = Path("experiments/text_variants.json")
 OUTPUT_DIR = Path("logs/experiments")
-DEFAULT_BASE = "http://127.0.0.1:5000/text"
+
+LOCAL_BASE_URLS = {
+    "text": "http://127.0.0.1:5000/text",
+    "complicated_text": "http://127.0.0.1:5000/complicated_text",
+}
 
 
 def load_config():
@@ -56,9 +60,9 @@ def variant_url(base_url, variant, seed):
     return f"{base_url}?{urlencode(params)}"
 
 
-def run_trial(url, provider, model):
+def run_trial(url, provider, model, captcha_type="text"):
     cmd = [
-        sys.executable, "main.py", "text",
+        sys.executable, "main.py", captcha_type,
         "--target", "local",
         "--url", url,
         "--provider", provider,
@@ -69,12 +73,11 @@ def run_trial(url, provider, model):
     return result.returncode == 0
 
 
-def wait_for_server(base_url, timeout=15):
+def wait_for_server(timeout=15):
     import urllib.request
-    health = base_url.replace("/text", "/") if "/text" in base_url else base_url
     for _ in range(timeout):
         try:
-            urllib.request.urlopen(health, timeout=2)
+            urllib.request.urlopen("http://127.0.0.1:5000/", timeout=2)
             return True
         except Exception:
             time.sleep(1)
@@ -85,17 +88,21 @@ def main():
     parser = argparse.ArgumentParser(description="Roda experimentos de CAPTCHA local")
     parser.add_argument("--sweep", type=str, default=None, help="Nome do sweep (ex: noise_sweep)")
     parser.add_argument("--trials", type=int, default=None, help="Tentativas por variante")
-    parser.add_argument("--base-url", type=str, default=DEFAULT_BASE)
+    parser.add_argument("--captcha-type", type=str, default="text",
+                        choices=["text", "complicated_text"],
+                        help="Tipo de CAPTCHA local a sweepear (padrão: text)")
     parser.add_argument("--provider", type=str, default="gemini")
     parser.add_argument("--model", type=str, default="gemini-2.5-flash")
     parser.add_argument("--start-server", action="store_true", help="Inicia captcha_server.py em subprocess")
     args = parser.parse_args()
 
+    base_url = LOCAL_BASE_URLS[args.captcha_type]
+
     server_proc = None
     if args.start_server:
         print("Iniciando captcha_server.py...")
         server_proc = subprocess.Popen([sys.executable, "captcha_server.py"])
-        if not wait_for_server(args.base_url):
+        if not wait_for_server():
             print("Erro: servidor local não respondeu a tempo.")
             if server_proc:
                 server_proc.terminate()
@@ -110,6 +117,7 @@ def main():
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_log = {
             "run_id": run_id,
+            "captcha_type": args.captcha_type,
             "provider": args.provider,
             "model": args.model,
             "trials_per_variant": trials,
@@ -117,17 +125,17 @@ def main():
             "results": [],
         }
 
-        print(f"Iniciando experimento {run_id} — {len(variants)} variantes × {trials} trials")
+        print(f"Iniciando experimento {run_id} — tipo={args.captcha_type} — {len(variants)} variantes × {trials} trials")
 
         for variant in variants:
             name = variant["name"]
             for trial in range(trials):
                 seed = hash((run_id, name, trial)) % (2**31)
-                url = variant_url(args.base_url, variant, seed)
+                url = variant_url(base_url, variant, seed)
                 print(f"\n--- {name} | trial {trial + 1}/{trials} ---")
                 print(f"URL: {url}")
                 t0 = time.time()
-                success = run_trial(url, args.provider, args.model)
+                success = run_trial(url, args.provider, args.model, args.captcha_type)
                 elapsed = round(time.time() - t0, 1)
                 meta = get_latest_session_metadata()
                 run_log["results"].append({
