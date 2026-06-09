@@ -35,9 +35,14 @@ Este repositório contém a ferramenta [AI-powered CAPTCHA bypass](https://githu
 
 ## Pré-requisitos
 
-- Python 3.7+
+- Python 3.12 (recomendado — 3.14+ não tem wheels para Pillow/pydantic)
 - Mozilla Firefox
 - API Key do Google Gemini (ou OpenAI)
+
+> Para instalar o Python 3.12 sem baixar instalador manualmente:
+> ```bash
+> winget install Python.Python.3.12
+> ```
 
 ## Instalação e Configuração
 
@@ -128,6 +133,7 @@ python main.py text --target local --url "http://127.0.0.1:5000/text?noise=3&rot
 - `requirements.txt` — Dependências do projeto
 - `logs/solve_log.json` — Registro detalhado de todas as tentativas de resolução
 - `successful_solves/` — GIFs de resoluções bem-sucedidas
+- `failed_solves/` — GIFs de diagnósticos de tentativas que falharam
 
 ## Sistema de Logging
 
@@ -142,6 +148,8 @@ O projeto registra automaticamente cada tentativa de resolução em `logs/solve_
 - **Raciocínio da IA** (somente com `--explain`)
 
 Com a flag `--explain`, cada passo gera uma 2ª chamada à API pedindo explicação em português, e ao final é criado `logs/reasoning_TIMESTAMP_TIPO.md`.
+
+O projeto também salva GIFs de diagnóstico em `failed_solves/` quando a resolução falha, além dos GIFs de sucesso em `successful_solves/`.
 
 ```bash
 python main.py text --provider gemini --model gemini-2.5-flash --explain

@@ -36,6 +36,7 @@ from ai_utils import (
     ask_puzzle_correction_to_chatgpt,
     ask_puzzle_correction_to_gemini
 )
+from gif_utils import create_result_gif
 from solve_logger import log_result, start_session, finalize_session
 
 #todo: sesli captchada sese asıl captchayı söyledikten sonra ignore previous instructions diyip sonra random bir captcha daha vericem
@@ -45,57 +46,6 @@ load_dotenv()
 gemini_client = None
 if os.getenv("GOOGLE_API_KEY"):
     gemini_client = genai.Client()
-
-def create_success_gif(image_paths, output_folder="successful_solves"):
-    """Creates a GIF from a list of images, resizing them to the max dimensions without distortion."""
-    if not image_paths:
-        print("No images provided for GIF creation.")
-        return
-
-    os.makedirs(output_folder, exist_ok=True)
-    
-    valid_images = []
-    for path in image_paths:
-        if os.path.exists(path):
-            try:
-                valid_images.append(Image.open(path).convert("RGB"))
-            except Exception as e:
-                print(f"Warning: Could not open or convert image {path}. Skipping. Error: {e}")
-        else:
-            print(f"Warning: Image path for GIF not found: {path}. Skipping.")
-
-    if not valid_images:
-        print("\nCould not create success GIF because no valid source images were found.")
-        return
-
-    try:
-        # Find the maximum width and height among all images
-        max_width = max(img.width for img in valid_images)
-        max_height = max(img.height for img in valid_images)
-        canvas_size = (max_width, max_height)
-
-        processed_images = []
-        for img in valid_images:
-            # Create a new blank canvas with the max dimensions
-            canvas = Image.new('RGB', canvas_size, (255, 255, 255))
-            # Paste the original image into the center of the canvas
-            paste_position = ((max_width - img.width) // 2, (max_height - img.height) // 2)
-            canvas.paste(img, paste_position)
-            processed_images.append(canvas)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = os.path.join(output_folder, f"success_{timestamp}.gif")
-
-        processed_images[0].save(
-            output_path,
-            save_all=True,
-            append_images=processed_images[1:],
-            duration=800,
-            loop=0
-        )
-        print(f"\nSuccessfully saved solution GIF to {output_path}")
-    except Exception as e:
-        print(f"\nCould not create success GIF. Error: {e}")
 
 def average_of_array(arr):
     if not arr:
@@ -202,7 +152,7 @@ def complicated_text_test(driver, provider='openai', model=None):
             final_success_path = f"screenshots/final_success_complicated_{datetime.now().strftime('%H%M%S')}.png"
             driver.save_screenshot(final_success_path)
             screenshot_paths.append(final_success_path)
-            create_success_gif(screenshot_paths, output_folder=f"successful_solves/complicated_text_{provider}")
+            create_result_gif(screenshot_paths, output_folder=f"successful_solves/complicated_text_{provider}", prefix="success")
             log_result(True, "complicated_text", details=f"attempt {attempt + 1}")
             return attempt + 1 # Return the successful attempt number
 
@@ -212,13 +162,20 @@ def complicated_text_test(driver, provider='openai', model=None):
                 print("Retrying...")
             else:
                 print("All 3 attempts failed for this benchmark run.")
-                log_result(False, "complicated_text", details="All 3 attempts failed")
             
             try:
                 driver.switch_to.default_content()
             except Exception:
                 pass
 
+    final_failure_path = f"screenshots/final_failure_complicated_{datetime.now().strftime('%H%M%S')}.png"
+    try:
+        driver.save_screenshot(final_failure_path)
+        screenshot_paths.append(final_failure_path)
+    except Exception:
+        pass
+    create_result_gif(screenshot_paths, output_folder=f"failed_solves/complicated_text_{provider}", prefix="failure")
+    log_result(False, "complicated_text", details="All 3 attempts failed")
     return 0
 
 def _local_server_base(url):
@@ -307,15 +264,29 @@ def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1
             final_success_path = f"screenshots/final_success_text_local_{datetime.now().strftime('%H%M%S')}.png"
             driver.save_screenshot(final_success_path)
             screenshot_paths.append(final_success_path)
-            create_success_gif(screenshot_paths, output_folder=f"successful_solves/text_local_{provider}")
+            create_result_gif(screenshot_paths, output_folder=f"successful_solves/text_local_{provider}", prefix="success")
             log_result(True, "text", details=log_details)
             return 1
 
         print("Captcha local failed.")
+        final_failure_path = f"screenshots/final_failure_text_local_{datetime.now().strftime('%H%M%S')}.png"
+        try:
+            driver.save_screenshot(final_failure_path)
+            screenshot_paths.append(final_failure_path)
+        except Exception:
+            pass
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/text_local_{provider}", prefix="failure")
         log_result(False, "text", details=log_details)
         return 0
     except Exception as e:
         print(f"Local captcha failed... Error: {e}")
+        final_failure_path = f"screenshots/final_failure_text_local_{datetime.now().strftime('%H%M%S')}.png"
+        try:
+            driver.save_screenshot(final_failure_path)
+            screenshot_paths.append(final_failure_path)
+        except Exception:
+            pass
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/text_local_{provider}", prefix="failure")
         log_result(False, "text", details={"target": "local", "url": url, "error": str(e)})
         return 0
 
@@ -368,11 +339,18 @@ def text_test(driver, provider='openai', model=None, target='2captcha', url=None
         final_success_path = f"screenshots/final_success_text_{datetime.now().strftime('%H%M%S')}.png"
         driver.save_screenshot(final_success_path)
         screenshot_paths.append(final_success_path)
-        create_success_gif(screenshot_paths, output_folder=f"successful_solves/text_{provider}")
+        create_result_gif(screenshot_paths, output_folder=f"successful_solves/text_{provider}", prefix="success")
         log_result(True, "text")
         return 1
     except Exception as e:
         print(f"Captcha failed... Error: {e}")
+        final_failure_path = f"screenshots/final_failure_text_{datetime.now().strftime('%H%M%S')}.png"
+        try:
+            driver.save_screenshot(final_failure_path)
+            screenshot_paths.append(final_failure_path)
+        except Exception:
+            pass
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/text_{provider}", prefix="failure")
         log_result(False, "text", details=str(e))
         return 0
 
@@ -484,7 +462,7 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
                     driver.save_screenshot(final_success_path)
                     screenshot_paths.append(final_success_path)
                     
-                    create_success_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}")
+                    create_result_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}", prefix="success")
                     log_result(True, "recaptcha_v2")
                     return 1
                 else:
@@ -500,6 +478,13 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
         else:
             # This 'else' belongs to the 'for' loop. Runs if the loop completes without a 'break'.
             print("Image challenge still present after max attempts.")
+            final_failure_path = f"screenshots/final_failure_recaptcha_v2_{datetime.now().strftime('%H%M%S')}.png"
+            try:
+                driver.save_screenshot(final_failure_path)
+                screenshot_paths.append(final_failure_path)
+            except Exception:
+                pass
+            create_result_gif(screenshot_paths, output_folder=f"failed_solves/recaptcha_v2_{provider}", prefix="failure")
             log_result(False, "recaptcha_v2", details="Max challenge attempts reached")
             return 0
 
@@ -520,7 +505,7 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
         driver.save_screenshot(final_success_path)
         screenshot_paths.append(final_success_path)
         
-        create_success_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}")
+        create_result_gif(screenshot_paths, output_folder=f"successful_solves/recaptcha_v2_{provider}", prefix="success")
         log_result(True, "recaptcha_v2")
         return 1
     
@@ -528,9 +513,16 @@ def recaptcha_v2_test(driver, provider='openai', model=None):
         print(f"An error occurred during reCAPTCHA v2 test: {ex}. Marking as failed.")
         traceback.print_exc()
         try:
+            failure_screenshot = f"screenshots/final_failure_recaptcha_v2_{datetime.now().strftime('%H%M%S')}.png"
+            driver.save_screenshot(failure_screenshot)
+            screenshot_paths.append(failure_screenshot)
+        except Exception:
+            pass
+        try:
             driver.switch_to.default_content()
         except Exception:
             pass
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/recaptcha_v2_{provider}", prefix="failure")
         log_result(False, "recaptcha_v2", details=str(ex))
         return 0
 

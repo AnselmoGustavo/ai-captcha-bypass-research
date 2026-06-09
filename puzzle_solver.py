@@ -17,6 +17,7 @@ from ai_utils import (
     ask_puzzle_correction_direction_to_openai,
     ask_best_fit_to_openai
 )
+from gif_utils import create_result_gif
 from solve_logger import log_result
 import traceback
 
@@ -65,48 +66,6 @@ def perform_final_drag(driver, offset):
     time.sleep(sleep_time) # Pause before release
     
     actions.release().perform()
-
-def create_success_gif(image_paths, output_folder="successful_solves"):
-    """Creates a GIF from a list of images and saves it."""
-    if not image_paths:
-        print("No images provided for GIF creation.")
-        return
-
-    os.makedirs(output_folder, exist_ok=True)
-    
-    valid_images = []
-    for path in image_paths:
-        if os.path.exists(path):
-            try:
-                # Convert to RGB to prevent mode issues (e.g., RGBA vs RGB) and open
-                valid_images.append(Image.open(path).convert("RGB"))
-            except Exception as e:
-                print(f"Warning: Could not open or convert image {path}. Skipping. Error: {e}")
-        else:
-            print(f"Warning: Image path for GIF not found: {path}. Skipping.")
-
-    if not valid_images:
-        print("\nCould not create success GIF because no valid source images were found.")
-        return
-
-    try:
-        # Resize all images to match the first one for consistency
-        base_size = valid_images[0].size
-        resized_images = [img.resize(base_size) for img in valid_images]
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = os.path.join(output_folder, f"success_{timestamp}.gif")
-
-        resized_images[0].save(
-            output_path,
-            save_all=True,
-            append_images=resized_images[1:],
-            duration=800,  # Milliseconds per frame
-            loop=0  # Loop forever
-        )
-        print(f"\n✨ Successfully saved solution GIF to {output_path}")
-    except Exception as e:
-        print(f"\nCould not create success GIF. Error: {e}")
 
 def set_slider_position_for_screenshot(driver, offset):
     """Uses JavaScript to instantly set the slider's visual position for an accurate screenshot."""
@@ -216,7 +175,7 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                     final_success_path = f"screenshots/final_success_{datetime.now().strftime('%H%M%S')}.png"
                     driver.save_screenshot(final_success_path)
                     generated_files.append(final_success_path)
-                    create_success_gif([initial_screenshot_path, correction_screenshot_path, final_success_path])
+                    create_result_gif([initial_screenshot_path, correction_screenshot_path, final_success_path], output_folder=f"successful_solves/puzzle_{provider}", prefix="success")
                     log_result(True, "puzzle", details=f"Solved on attempt {attempt + 1} (first slide)")
                     return 1
 
@@ -315,7 +274,7 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                     final_success_path = f"screenshots/final_success_{datetime.now().strftime('%H%M%S')}.png"
                     driver.save_screenshot(final_success_path)
                     generated_files.append(final_success_path)
-                    create_success_gif([initial_screenshot_path, correction_screenshot_path, scan_screenshots[best_fit_index], final_success_path], output_folder=f"successful_solves/puzzle_{provider}")
+                    create_result_gif([initial_screenshot_path, correction_screenshot_path, scan_screenshots[best_fit_index], final_success_path], output_folder=f"successful_solves/puzzle_{provider}", prefix="success")
                     log_result(True, "puzzle", details=f"Solved on attempt {attempt + 1} (fine-grained scan)")
                     return 1
                 else:
@@ -339,11 +298,20 @@ def solve_geetest_puzzle(driver, provider='gemini'):
                         return 0 # Cannot recover, exit
                 
         print("\nAll 3 puzzle attempts failed.")
+        final_failure_path = f"screenshots/final_failure_{datetime.now().strftime('%H%M%S')}.png"
+        try:
+            driver.save_screenshot(final_failure_path)
+            generated_files.append(final_failure_path)
+        except Exception:
+            pass
+        create_result_gif(generated_files, output_folder=f"failed_solves/puzzle_{provider}", prefix="failure")
         log_result(False, "puzzle", details="All 3 attempts failed")
         return 0
     finally:
         print("\nCleaning up generated puzzle files...")
         for f in generated_files:
+            if not f.lower().endswith('.png'):
+                continue
             try:
                 os.remove(f)
                 print(f"  Deleted {f}")
