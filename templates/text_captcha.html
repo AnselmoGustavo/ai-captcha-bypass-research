@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="captcha-variant" content='{{ variant_json }}'>
-  <title>CAPTCHA de Texto — Laboratório Local</title>
+  <title>{{ captcha_title }} — Laboratório Local</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
     h1 { font-size: 1.25rem; }
@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <h1>CAPTCHA de Texto — Laboratório Local</h1>
+  <h1>{{ captcha_title }} — Laboratório Local</h1>
   <p class="params">Parâmetros: {{ variant_display }}</p>
   <form id="captcha-form" method="post" action="/api/verify">
     <img id="captcha-image" data-testid="captcha-image" src="/captcha-image.png" alt="">

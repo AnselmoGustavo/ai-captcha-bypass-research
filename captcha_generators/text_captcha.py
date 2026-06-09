@@ -25,23 +25,55 @@ DEFAULT_VARIANT = {
     "bg_color": "#f0f0f0",
     "fg_color": "#1a1a1a",
     "wave": 0,
+    "occlusion": 0,
 }
 
+# Preset difícil para complicated_text: mais ruído, rotação, sobreposição, linhas de oclusão
+COMPLICATED_DEFAULT_VARIANT = {
+    "noise": 3,
+    "rotation": 25,
+    "overlap": 1,
+    "length": 6,
+    "font_size": 36,
+    "char_set": "mixed_case",
+    "bg_color": "#e8e8e8",
+    "fg_color": "#2a2a2a",
+    "wave": 2,
+    "occlusion": 2,
+}
 
-def parse_variant(params):
-    """Mescla query params com defaults e normaliza tipos."""
-    variant = dict(DEFAULT_VARIANT)
-    for key in DEFAULT_VARIANT:
+INT_KEYS = ("noise", "overlap", "length", "font_size", "wave", "rotation", "occlusion")
+
+
+def _apply_params(base, params):
+    variant = dict(base)
+    for key in base:
         if key not in params or params[key] in (None, ""):
             continue
         raw = params[key]
-        if key in ("noise", "overlap", "length", "font_size", "wave", "rotation"):
-            variant[key] = int(raw)
-        else:
-            variant[key] = raw
+        variant[key] = int(raw) if key in INT_KEYS else raw
+    return variant
+
+
+def parse_variant(params):
+    """Mescla query params com defaults simples e normaliza tipos."""
+    variant = _apply_params(DEFAULT_VARIANT, params)
     if variant["char_set"] not in CHAR_SETS:
         variant["char_set"] = "alnum"
     return variant
+
+
+def parse_variant_complicated(params):
+    """Mescla query params com defaults difíceis e normaliza tipos."""
+    variant = _apply_params(COMPLICATED_DEFAULT_VARIANT, params)
+    if variant["char_set"] not in CHAR_SETS:
+        variant["char_set"] = "mixed_case"
+    return variant
+
+
+def check(answer, user_answer):
+    """Verifica resposta case-insensitive."""
+    return (user_answer or "").strip().upper() == (answer or "").strip().upper()
 
 
 def _get_font(size):
@@ -94,6 +126,10 @@ def generate_text_captcha(variant, seed=None):
         draw.line([(x1, y1), (x2, y2)], fill=v["fg_color"], width=1)
     for _ in range(v["noise"] * 15):
         draw.point((rng.randint(0, width - 1), rng.randint(0, height - 1)), fill=v["fg_color"])
+
+    for _ in range(v.get("occlusion", 0)):
+        y = rng.randint(height // 4, 3 * height // 4)
+        draw.line([(0, y), (width, y)], fill=v["fg_color"], width=rng.randint(2, 4))
 
     buf = BytesIO()
     img.save(buf, format="PNG")

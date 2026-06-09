@@ -13,6 +13,7 @@ from flask import Flask, jsonify, make_response, render_template, request, sessi
 from captcha_generators.text_captcha import (
     generate_text_captcha,
     parse_variant,
+    parse_variant_complicated,
     variant_to_json,
 )
 
@@ -34,16 +35,16 @@ def index():
     )
 
 
-@app.route("/text")
-def text_captcha_page():
+def _render_text_based_captcha(parser_fn, captcha_type, captcha_title):
     seed = request.args.get("seed")
     seed = int(seed) if seed is not None and str(seed).lstrip("-").isdigit() else None
-    variant = parse_variant(request.args.to_dict())
+    variant = parser_fn(request.args.to_dict())
     image_bytes, answer, variant = generate_text_captcha(variant, seed=seed)
 
     token = uuid.uuid4().hex
     _image_cache[token] = image_bytes
     session["image_token"] = token
+    session["captcha_type"] = captcha_type
     session["answer"] = answer
     session["variant"] = variant
     if seed is not None:
@@ -53,9 +54,20 @@ def text_captcha_page():
     variant_display = ", ".join(f"{k}={v}" for k, v in variant.items())
     return render_template(
         "text_captcha.html",
+        captcha_title=captcha_title,
         variant_json=variant_json,
         variant_display=variant_display,
     )
+
+
+@app.route("/text")
+def text_captcha_page():
+    return _render_text_based_captcha(parse_variant, "text", "CAPTCHA de Texto")
+
+
+@app.route("/complicated_text")
+def complicated_text_captcha_page():
+    return _render_text_based_captcha(parse_variant_complicated, "complicated_text", "CAPTCHA de Texto Distorcido")
 
 
 @app.route("/captcha-image.png")

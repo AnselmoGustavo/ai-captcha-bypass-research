@@ -100,11 +100,17 @@ python captcha_server.py
 
 **Terminal 2** — rodar o bot contra o CAPTCHA local:
 ```bash
-# CAPTCHA padrão (sem distorção)
+# Texto simples (padrão, sem distorção)
 python main.py text --target local --provider gemini --model gemini-2.5-flash
 
-# CAPTCHA com parâmetros customizados (via URL)
+# Texto simples com parâmetros customizados
 python main.py text --target local --url "http://127.0.0.1:5000/text?noise=3&rotation=20&length=6&seed=42" --provider gemini --model gemini-2.5-flash
+
+# Texto distorcido (preset difícil: noise=3, rotation=25, occlusion=2, wave=2)
+python main.py complicated_text --target local --provider gemini --model gemini-2.5-flash
+
+# Texto distorcido com parâmetros customizados
+python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?noise=5&rotation=35&occlusion=3&seed=42" --provider gemini --model gemini-2.5-flash
 ```
 
 ## Como Funciona
@@ -120,9 +126,9 @@ python main.py text --target local --url "http://127.0.0.1:5000/text?noise=3&rot
 ## Estrutura do Projeto
 
 - `main.py` — Ponto de entrada principal (`--target 2captcha|local`)
-- `captcha_server.py` — Servidor Flask de CAPTCHAs customizados
-- `captcha_generators/text_captcha.py` — Gera imagens de CAPTCHA com parâmetros variáveis
-- `templates/text_captcha.html` — Página HTML com DOM estável para o bot
+- `captcha_server.py` — Servidor Flask de CAPTCHAs customizados (rotas: `/text`, `/complicated_text`)
+- `captcha_generators/text_captcha.py` — Gera imagens de CAPTCHA com parâmetros variáveis; expõe `DEFAULT_VARIANT`, `COMPLICATED_DEFAULT_VARIANT`, `parse_variant`, `parse_variant_complicated`, `check`
+- `templates/text_captcha.html` — Página HTML com DOM estável para o bot (IDs: `captcha-image`, `captcha-input`, `captcha-submit`, `captcha-result`)
 - `run_experiments.py` — Roda bateria de testes automatizados
 - `failure_report.py` — Relatório de taxa de falha por parâmetro
 - `experiments/text_variants.json` — Matriz de variantes para experimentos
@@ -170,30 +176,38 @@ O servidor Flask gera CAPTCHAs de texto com parâmetros controláveis, para desc
 
 Abra no navegador ou passe a URL para o bot. Cada parâmetro na query string altera a dificuldade:
 
-| Parâmetro | Padrão | Descrição |
-|-----------|--------|-----------|
-| `noise` | 0 | Ruído visual (linhas e pontos sobre o texto) |
-| `rotation` | 0 | Rotação máxima por caractere (graus) |
-| `overlap` | 0 | Sobreposição entre caracteres |
-| `length` | 5 | Quantidade de caracteres |
-| `font_size` | 36 | Tamanho da fonte |
-| `char_set` | alnum | `alnum`, `mixed_case` ou `symbols` (O/0/l/1) |
-| `bg_color` | #f0f0f0 | Cor de fundo |
-| `fg_color` | #1a1a1a | Cor do texto |
-| `wave` | 0 | Distorção ondulada vertical |
-| `seed` | aleatório | Fixa a imagem para reprodutibilidade |
+| Parâmetro | Padrão (`text`) | Padrão (`complicated_text`) | Descrição |
+|-----------|--------|-----------|-----------|
+| `noise` | 0 | 3 | Ruído visual (linhas e pontos sobre o texto) |
+| `rotation` | 0 | 25 | Rotação máxima por caractere (graus) |
+| `overlap` | 0 | 1 | Sobreposição entre caracteres |
+| `occlusion` | 0 | 2 | Linhas horizontais cruzando o texto |
+| `wave` | 0 | 2 | Distorção ondulada vertical |
+| `length` | 5 | 6 | Quantidade de caracteres |
+| `font_size` | 36 | 36 | Tamanho da fonte |
+| `char_set` | alnum | mixed_case | `alnum`, `mixed_case` ou `symbols` (O/0/l/1) |
+| `bg_color` | #f0f0f0 | #e8e8e8 | Cor de fundo |
+| `fg_color` | #1a1a1a | #2a2a2a | Cor do texto |
+| `seed` | aleatório | aleatório | Fixa a imagem para reprodutibilidade |
 
 **Exemplos no navegador:**
 ```
+# Texto simples
 http://127.0.0.1:5000/text
 http://127.0.0.1:5000/text?noise=3&rotation=20
 http://127.0.0.1:5000/text?char_set=symbols&length=6&noise=2
 http://127.0.0.1:5000/text?noise=4&rotation=30&overlap=2&seed=42
+
+# Texto distorcido (preset difícil, parâmetros sobrescrevíveis)
+http://127.0.0.1:5000/complicated_text
+http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42
 ```
 
 **Bot resolver o mesmo CAPTCHA:**
 ```bash
 python main.py text --target local --url "http://127.0.0.1:5000/text?noise=4&rotation=30&seed=42" --provider gemini --model gemini-2.5-flash
+
+python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42" --provider gemini --model gemini-2.5-flash
 ```
 
 ### 2. Rodar experimentos em lote
@@ -239,7 +253,7 @@ Edite `experiments/text_variants.json` para adicionar novos sweeps:
 
 ### Compatibilidade
 
-Os CAPTCHAs do **2captcha continuam funcionando** sem nenhuma alteração nos comandos. O modo local (`--target local`) é opcional e, por enquanto, suporta apenas `captcha_type=text`.
+Os CAPTCHAs do **2captcha continuam funcionando** sem nenhuma alteração nos comandos. O modo local (`--target local`) suporta `text` e `complicated_text`.
 
 ## Referências
 

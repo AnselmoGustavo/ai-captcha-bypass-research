@@ -96,7 +96,9 @@ def audio_test(file_path='files/audio.mp3', provider='gemini', model=None):
         log_result(False, "audio", details=str(e))
         return False
 
-def complicated_text_test(driver, provider='openai', model=None):
+def complicated_text_test(driver, provider='openai', model=None, target='2captcha', url=None):
+    if target == 'local':
+        return complicated_text_test_local(driver, provider, model, url or 'http://127.0.0.1:5000/complicated_text')
     """
     Solves a single "Complicated Text" captcha instance, trying up to 3 times.
     The benchmark is successful if any attempt passes.
@@ -208,8 +210,8 @@ def _read_variant_from_page(driver):
         return {}
 
 
-def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/text'):
-    """Resolve CAPTCHA de texto do servidor Flask local."""
+def _local_text_solver(driver, captcha_type, provider, model, url):
+    """Resolve qualquer CAPTCHA de texto (simples ou distorcido) do servidor Flask local."""
     driver.get(url)
     captcha_image = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.ID, "captcha-image"))
@@ -222,7 +224,7 @@ def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1
     time.sleep(1)
     screenshot_paths = []
     try:
-        captcha_screenshot_path = 'screenshots/text_captcha_local_1.png'
+        captcha_screenshot_path = f'screenshots/{captcha_type}_local_1.png'
         captcha_image.screenshot(captcha_screenshot_path)
         screenshot_paths.append(captcha_screenshot_path)
 
@@ -260,35 +262,43 @@ def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1
         }
 
         if success:
-            print("Captcha local passed successfully!")
-            final_success_path = f"screenshots/final_success_text_local_{datetime.now().strftime('%H%M%S')}.png"
+            print(f"{captcha_type} local passed successfully!")
+            final_success_path = f"screenshots/final_success_{captcha_type}_local_{datetime.now().strftime('%H%M%S')}.png"
             driver.save_screenshot(final_success_path)
             screenshot_paths.append(final_success_path)
-            create_result_gif(screenshot_paths, output_folder=f"successful_solves/text_local_{provider}", prefix="success")
-            log_result(True, "text", details=log_details)
+            create_result_gif(screenshot_paths, output_folder=f"successful_solves/{captcha_type}_local_{provider}", prefix="success")
+            log_result(True, captcha_type, details=log_details)
             return 1
 
-        print("Captcha local failed.")
-        final_failure_path = f"screenshots/final_failure_text_local_{datetime.now().strftime('%H%M%S')}.png"
+        print(f"{captcha_type} local failed.")
+        final_failure_path = f"screenshots/final_failure_{captcha_type}_local_{datetime.now().strftime('%H%M%S')}.png"
         try:
             driver.save_screenshot(final_failure_path)
             screenshot_paths.append(final_failure_path)
         except Exception:
             pass
-        create_result_gif(screenshot_paths, output_folder=f"failed_solves/text_local_{provider}", prefix="failure")
-        log_result(False, "text", details=log_details)
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/{captcha_type}_local_{provider}", prefix="failure")
+        log_result(False, captcha_type, details=log_details)
         return 0
     except Exception as e:
         print(f"Local captcha failed... Error: {e}")
-        final_failure_path = f"screenshots/final_failure_text_local_{datetime.now().strftime('%H%M%S')}.png"
+        final_failure_path = f"screenshots/final_failure_{captcha_type}_local_{datetime.now().strftime('%H%M%S')}.png"
         try:
             driver.save_screenshot(final_failure_path)
             screenshot_paths.append(final_failure_path)
         except Exception:
             pass
-        create_result_gif(screenshot_paths, output_folder=f"failed_solves/text_local_{provider}", prefix="failure")
-        log_result(False, "text", details={"target": "local", "url": url, "error": str(e)})
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/{captcha_type}_local_{provider}", prefix="failure")
+        log_result(False, captcha_type, details={"target": "local", "url": url, "error": str(e)})
         return 0
+
+
+def text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/text'):
+    return _local_text_solver(driver, 'text', provider, model, url)
+
+
+def complicated_text_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/complicated_text'):
+    return _local_text_solver(driver, 'complicated_text', provider, model, url)
 
 
 def text_test(driver, provider='openai', model=None, target='2captcha', url=None):
@@ -536,13 +546,9 @@ def main():
     parser.add_argument('--explain', action='store_true', help="Documenta o raciocínio da IA (2a chamada à API + relatório Markdown)")
     parser.add_argument('--target', choices=['2captcha', 'local'], default='2captcha',
                         help="2captcha=demo online (padrão); local=servidor Flask")
-    parser.add_argument('--url', type=str, default='http://127.0.0.1:5000/text',
+    parser.add_argument('--url', type=str, default=None,
                         help="URL do CAPTCHA local (com query params de variante)")
     args = parser.parse_args()
-
-    if args.target == 'local' and args.captcha_type != 'text':
-        print("Erro: --target local só suporta captcha_type=text no momento.")
-        sys.exit(1)
 
     os.makedirs('screenshots', exist_ok=True)
 
@@ -563,7 +569,7 @@ def main():
                     result = text_test(driver, args.provider, args.model, args.target, args.url)
                     run_success = result == 1
                 elif args.captcha_type == 'complicated_text':
-                    result = complicated_text_test(driver, args.provider, args.model)
+                    result = complicated_text_test(driver, args.provider, args.model, args.target, args.url)
                     run_success = result > 0
                     run_details = f"attempt {result}" if run_success else "All attempts failed"
                 elif args.captcha_type == 'recaptcha_v2':
