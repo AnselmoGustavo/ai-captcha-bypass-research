@@ -193,8 +193,7 @@ def _fetch_local_debug(url):
         seed = qs.get("seed", [None])[0]
         if seed is not None:
             with urllib.request.urlopen(f"{base}/api/answer_by_seed/{seed}", timeout=5) as resp:
-                data = json.loads(resp.read().decode())
-                return {"answer": data.get("answer"), "variant": data.get("variant")}
+                return json.loads(resp.read().decode())
         with urllib.request.urlopen(f"{base}/api/answer", timeout=5) as resp:
             return json.loads(resp.read().decode())
     except Exception as e:
@@ -364,7 +363,94 @@ def text_test(driver, provider='openai', model=None, target='2captcha', url=None
         log_result(False, "text", details=str(e))
         return 0
 
-def recaptcha_v2_test(driver, provider='openai', model=None):
+def recaptcha_v2_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/recaptcha_v2'):
+    """Resolve reCAPTCHA v2 sintético do servidor Flask local."""
+    driver.get(url)
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "captcha-grid"))
+    )
+    WebDriverWait(driver, 15).until(
+        lambda d: d.execute_script(
+            "const imgs = document.querySelectorAll('.tile img');"
+            "return imgs.length === 9 && Array.from(imgs).every(i => i.complete && i.naturalWidth > 0);"
+        )
+    )
+    time.sleep(0.5)
+    screenshot_paths = []
+    try:
+        instruction_el = driver.find_element(By.ID, "captcha-instruction")
+        object_name = instruction_el.get_attribute("data-target")
+        print(f"Instrução: {instruction_el.text}  |  Alvo: {object_name}")
+
+        tile_els = driver.find_elements(By.CSS_SELECTOR, ".tile")
+        tile_paths = []
+        for i, tile in enumerate(tile_els):
+            path = f"screenshots/grid_tile_local_{i}.png"
+            tile.screenshot(path)
+            screenshot_paths.append(path)
+            tile_paths.append(path)
+
+        tasks = [(i, path, object_name, provider, model) for i, path in enumerate(tile_paths)]
+        tiles_to_click = []
+        with ThreadPoolExecutor(max_workers=9) as executor:
+            for tile_index, should_click in executor.map(check_tile_for_object, tasks):
+                if should_click:
+                    tiles_to_click.append(tile_index)
+
+        print(f"IA selecionou tiles: {sorted(tiles_to_click)}")
+        for i in sorted(tiles_to_click):
+            try:
+                tile_els[i].click()
+                time.sleep(random.uniform(0.1, 0.3))
+            except Exception:
+                pass
+
+        WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "captcha-submit"))
+        ).click()
+
+        WebDriverWait(driver, 10).until(
+            lambda d: d.find_element(By.ID, "captcha-result").get_attribute("data-visible") == "true"
+        )
+        success = driver.find_element(By.ID, "captcha-result").get_attribute("data-success") == "true"
+
+        debug = _fetch_local_debug(url)
+        ground_truth = debug.get("solution")
+        variant = debug.get("variant") or _read_variant_from_page(driver)
+        log_details = {
+            "variant": variant,
+            "ground_truth": ground_truth,
+            "ai_response": sorted(tiles_to_click),
+            "target": "local",
+            "url": url,
+        }
+
+        status = "success" if success else "failure"
+        final_path = f"screenshots/final_{status}_recaptcha_v2_local_{datetime.now().strftime('%H%M%S')}.png"
+        driver.save_screenshot(final_path)
+        screenshot_paths.append(final_path)
+        create_result_gif(screenshot_paths, output_folder=f"{'successful_solves' if success else 'failed_solves'}/recaptcha_v2_local_{provider}", prefix=status)
+        log_result(success, "recaptcha_v2", details=log_details)
+
+        print(f"reCAPTCHA v2 local {'passed!' if success else 'failed.'}")
+        return 1 if success else 0
+
+    except Exception as e:
+        print(f"reCAPTCHA v2 local error: {e}")
+        final_path = f"screenshots/final_failure_recaptcha_v2_local_{datetime.now().strftime('%H%M%S')}.png"
+        try:
+            driver.save_screenshot(final_path)
+            screenshot_paths.append(final_path)
+        except Exception:
+            pass
+        create_result_gif(screenshot_paths, output_folder=f"failed_solves/recaptcha_v2_local_{provider}", prefix="failure")
+        log_result(False, "recaptcha_v2", details={"target": "local", "url": url, "error": str(e)})
+        return 0
+
+
+def recaptcha_v2_test(driver, provider='openai', model=None, target='2captcha', url=None):
+    if target == 'local':
+        return recaptcha_v2_test_local(driver, provider, model, url or 'http://127.0.0.1:5000/recaptcha_v2')
     """
     Solves a single reCAPTCHA v2 instance on the 2captcha demo page.
     Returns 1 for success, 0 for failure.
@@ -573,7 +659,7 @@ def main():
                     run_success = result > 0
                     run_details = f"attempt {result}" if run_success else "All attempts failed"
                 elif args.captcha_type == 'recaptcha_v2':
-                    result = recaptcha_v2_test(driver, args.provider, args.model)
+                    result = recaptcha_v2_test(driver, args.provider, args.model, args.target, args.url)
                     run_success = result == 1
             finally:
                 driver.quit()

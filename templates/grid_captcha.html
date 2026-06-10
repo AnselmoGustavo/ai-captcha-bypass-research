@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="captcha-variant" content='{{ variant_json }}'>
+  <title>reCAPTCHA Sintético — Laboratório Local</title>
+  <style>
+    :root { --tile: {{ tile_size }}px; }
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.15rem; }
+    #captcha-instruction { font-weight: 600; margin: 1rem 0 0.5rem; font-size: 1rem; }
+    #captcha-grid {
+      display: grid;
+      grid-template-columns: repeat(3, var(--tile));
+      gap: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .tile {
+      width: var(--tile);
+      height: var(--tile);
+      cursor: pointer;
+      border: 3px solid #ccc;
+      box-sizing: border-box;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .tile.selected { border-color: #1a73e8; box-shadow: 0 0 0 2px #1a73e8; }
+    .tile img { width: 100%; height: 100%; display: block; pointer-events: none; }
+    #captcha-submit { margin-top: 0.5rem; padding: 0.5rem 1.5rem; font-size: 1rem; cursor: pointer; }
+    #captcha-result { margin-top: 0.75rem; padding: 0.75rem; border-radius: 4px; display: none; }
+    #captcha-result[data-visible="true"] { display: block; }
+    #captcha-result[data-success="true"]  { background: #d4edda; color: #155724; }
+    #captcha-result[data-success="false"] { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h1>reCAPTCHA Sintético — Laboratório Local</h1>
+  <p id="captcha-instruction" data-target="{{ target_description }}">{{ instruction }}</p>
+  <div id="captcha-grid">
+    {% for i in range(9) %}
+    <div class="tile" id="tile-{{ i }}" data-index="{{ i }}">
+      <img id="tile-img-{{ i }}" src="/grid-tile/{{ grid_token }}/{{ i }}.png" alt="tile {{ i }}">
+    </div>
+    {% endfor %}
+  </div>
+  <button id="captcha-submit">Verificar</button>
+  <div id="captcha-result" data-success="false" data-visible="false"></div>
+
+  <script>
+    const selected = new Set();
+
+    document.querySelectorAll('.tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const idx = parseInt(tile.dataset.index, 10);
+        if (selected.has(idx)) {
+          selected.delete(idx);
+          tile.classList.remove('selected');
+        } else {
+          selected.add(idx);
+          tile.classList.add('selected');
+        }
+      });
+    });
+
+    document.getElementById('captcha-submit').addEventListener('click', async () => {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected: Array.from(selected) }),
+      });
+      const data = await res.json();
+      const el = document.getElementById('captcha-result');
+      el.dataset.success  = data.success ? 'true' : 'false';
+      el.dataset.visible  = 'true';
+      el.textContent = data.success ? 'Correto!' : 'Incorreto. Tente novamente.';
+    });
+  </script>
+</body>
+</html>

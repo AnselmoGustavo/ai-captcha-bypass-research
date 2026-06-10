@@ -4,7 +4,7 @@ Repositório de experimentação utilizado como parte do trabalho acadêmico **"
 
 ## Sobre o Trabalho
 
-Este estudo analisa o comportamento de bots que contornam mecanismos como CAPTCHA e reCAPTCHA, com foco em como eles respondem a interfaces que mudam de forma procedural. A proposta utiliza aprendizado de máquina para memorizar comportamentos padronizados dos bots e altera elementos da interface de forma imprevisível, buscando interromper interações automatizadas e aumentar a eficácia dos processos de autenticação.
+Este estudo analisa os padrões de falha de bots baseados em IA ao resolver diferentes tipos de CAPTCHA, com foco em identificar quais variações visuais e estruturais comprometem a capacidade de automação. Os dados coletados servem para avaliar a **viabilidade** de uma autenticação procedural — que alteraria elementos da interface de forma imprevisível para resistir a bots — como proposta de defesa para trabalhos futuros.
 
 **Autores:**
 - Ana Beatriz Costa Viana — abcviana@sga.pucminas.br
@@ -17,9 +17,9 @@ Este estudo analisa o comportamento de bots que contornam mecanismos como CAPTCH
 Este repositório contém a ferramenta [AI-powered CAPTCHA bypass](https://github.com/aydinnyunus/ai-captcha-bypass) (AYDIN, 2025), utilizada na etapa experimental do trabalho para:
 
 1. Observar o comportamento de bots baseados em IA ao resolver diferentes tipos de CAPTCHA
-2. Identificar quais padrões de interface são explorados durante a resolução dos desafios
-3. Analisar como técnicas de visão computacional e automação de interface influenciam o desempenho do bot
-4. Avaliar como alterações procedurais na interface impactam a capacidade de automação
+2. Identificar quais parâmetros visuais (ruído, rotação, oclusão, sobreposição) causam falhas e em que proporção
+3. Analisar o raciocínio da IA nas tentativas falhas para entender os pontos de ruptura
+4. Produzir evidências empíricas que fundamentem a viabilidade de uma defesa procedural
 
 > **Nota:** Os experimentos não exploram sistemas reais, apenas ambientes de teste (2captcha.com/demo/).
 

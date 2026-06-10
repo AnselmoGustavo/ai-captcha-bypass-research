@@ -26,12 +26,13 @@ from pathlib import Path
 
 OUTPUT_DIR = Path("logs/tests")
 
-LOCAL_TYPES = ["text", "complicated_text"]
+LOCAL_TYPES = ["text", "complicated_text", "recaptcha_v2"]
 REMOTE_TYPES = ["text", "complicated_text", "recaptcha_v2", "puzzle"]
 
 LOCAL_URLS = {
     "text": "http://127.0.0.1:5000/text",
     "complicated_text": "http://127.0.0.1:5000/complicated_text",
+    "recaptcha_v2": "http://127.0.0.1:5000/recaptcha_v2",
 }
 
 
