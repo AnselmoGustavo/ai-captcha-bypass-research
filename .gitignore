@@ -3,8 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Logs de resolução de CAPTCHA
-logs/
+# Logs de resolução de CAPTCHA — ignorar arquivo de log em tempo real
+logs/solve_log.json
+logs/reasoning_*.md
+
+# Artefatos de pesquisa são versionados (tests/, experiments/, reports/, charts/)
 
 # C extensions
 *.so

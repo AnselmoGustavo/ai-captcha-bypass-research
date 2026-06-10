@@ -14,12 +14,14 @@ Salva em logs/solve_log.json cada tentativa com:
 import os
 import json
 import uuid
+import threading
 from datetime import datetime
 
 LOG_DIR = "logs"
 LOG_FILE = os.path.join(LOG_DIR, "solve_log.json")
 
 _current_session = None
+_log_lock = threading.Lock()
 
 
 def _ensure_log_file():
@@ -168,13 +170,12 @@ def log_attempt(captcha_type, provider, model, prompt, ai_response, success=None
         "extra": extra,
     }
 
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
-        logs = json.load(f)
-
-    logs.append(entry)
-
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
-        json.dump(logs, f, ensure_ascii=False, indent=2)
+    with _log_lock:
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
+        logs.append(entry)
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
 
     print(f"[LOG] {captcha_type} | {provider}/{model} | resposta: {str(ai_response)[:80] if ai_response else 'N/A'}")
 
@@ -185,38 +186,39 @@ def log_result(success, captcha_type=None, details=None):
     """
     _ensure_log_file()
 
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
-        logs = json.load(f)
-
     session_id = _current_session["session_id"] if _current_session else None
-    updated = False
-    for entry in logs:
-        if session_id and entry.get("session_id") != session_id:
-            continue
-        entry["success"] = success
-        if details:
-            if entry.get("extra") is None:
-                entry["extra"] = {}
-            entry["extra"]["result_details"] = details
-        updated = True
 
-    if not updated:
-        # No entries for this session yet — create one so the session is always recorded
-        logs.append({
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat(),
-            "captcha_type": (_current_session or {}).get("captcha_type") or captcha_type,
-            "provider": (_current_session or {}).get("provider"),
-            "model": (_current_session or {}).get("model"),
-            "prompt": None,
-            "ai_response": None,
-            "reasoning": None,
-            "success": success,
-            "extra": {"result_details": details} if details else None,
-        })
+    with _log_lock:
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
+            logs = json.load(f)
 
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
-        json.dump(logs, f, ensure_ascii=False, indent=2)
+        updated = False
+        for entry in logs:
+            if session_id and entry.get("session_id") != session_id:
+                continue
+            entry["success"] = success
+            if details:
+                if entry.get("extra") is None:
+                    entry["extra"] = {}
+                entry["extra"]["result_details"] = details
+            updated = True
+
+        if not updated:
+            logs.append({
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat(),
+                "captcha_type": (_current_session or {}).get("captcha_type") or captcha_type,
+                "provider": (_current_session or {}).get("provider"),
+                "model": (_current_session or {}).get("model"),
+                "prompt": None,
+                "ai_response": None,
+                "reasoning": None,
+                "success": success,
+                "extra": {"result_details": details} if details else None,
+            })
+
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
 
     status = "SUCESSO" if success else "FALHA"
     print(f"[LOG] Resultado: {status}")

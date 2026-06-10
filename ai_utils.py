@@ -30,7 +30,7 @@ def _log_with_reasoning(captcha_type, provider, model, prompt, result, media_pat
 def ask_text_to_chatgpt(image_path, model=None):
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     base64_image = image_to_base64(image_path)
-    short_prompt = ("Act as a blind person assistant. Read the text from the image and give me only the text answer.")
+    short_prompt = ("Read the CAPTCHA text from the image. Reply with ONLY the characters, no spaces, no punctuation, no explanation. Example: if the image shows 'A B C 1 2', reply exactly: ABC12")
     model_to_use = model if model else "gpt-4o"
     response = client.chat.completions.create(
         model=model_to_use,
@@ -38,7 +38,7 @@ def ask_text_to_chatgpt(image_path, model=None):
             {"role": "system", "content": [{"type": "text", "text": short_prompt}]},
             {"role": "user", "content": [
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
-                {"type": "text", "text": "Give the only text from the image. If there is no text, give me empty string."}
+                {"type": "text", "text": "Output only the CAPTCHA characters with no spaces, no separators, no explanation."}
             ]},
         ],
         temperature=1, max_tokens=256, top_p=1, frequency_penalty=0, presence_penalty=0

@@ -1,0 +1,105 @@
+{
+  "run_id": "20260610_163707",
+  "target": "2captcha",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "trials_per_type": 2,
+  "results": [
+    {
+      "type": "text",
+      "trial": 1,
+      "success": true,
+      "elapsed_s": 25.5,
+      "target": "2captcha",
+      "session_id": "805c3a8e",
+      "ground_truth": null,
+      "ai_response": "W9H5K",
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "text",
+      "trial": 2,
+      "success": true,
+      "elapsed_s": 26.4,
+      "target": "2captcha",
+      "session_id": "4464ecbe",
+      "ground_truth": null,
+      "ai_response": "W9H5K",
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 1,
+      "success": true,
+      "elapsed_s": 28.0,
+      "target": "2captcha",
+      "session_id": "2d6c2a2e",
+      "ground_truth": null,
+      "ai_response": "JORO",
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 2,
+      "success": true,
+      "elapsed_s": 40.6,
+      "target": "2captcha",
+      "session_id": "c19c6a97",
+      "ground_truth": null,
+      "ai_response": "MEOG",
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 1,
+      "success": false,
+      "elapsed_s": 23.2,
+      "target": "2captcha",
+      "session_id": "2245be82",
+      "ground_truth": null,
+      "ai_response": null,
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 2,
+      "success": false,
+      "elapsed_s": 22.8,
+      "target": "2captcha",
+      "session_id": "65d51cc6",
+      "ground_truth": null,
+      "ai_response": null,
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "puzzle",
+      "trial": 1,
+      "success": false,
+      "elapsed_s": 34.0,
+      "target": "2captcha",
+      "session_id": "4670f16d",
+      "ground_truth": null,
+      "ai_response": "I don't know who this is.",
+      "variant": null,
+      "error_type": null
+    },
+    {
+      "type": "puzzle",
+      "trial": 2,
+      "success": false,
+      "elapsed_s": 50.9,
+      "target": "2captcha",
+      "session_id": "cbea1b0e",
+      "ground_truth": null,
+      "ai_response": "2",
+      "variant": null,
+      "error_type": null
+    }
+  ]
+}

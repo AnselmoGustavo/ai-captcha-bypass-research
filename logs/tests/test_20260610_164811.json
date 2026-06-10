@@ -1,0 +1,349 @@
+{
+  "run_id": "20260610_164811",
+  "target": "local",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "trials_per_type": 5,
+  "results": [
+    {
+      "type": "text",
+      "trial": 1,
+      "success": true,
+      "elapsed_s": 18.7,
+      "target": "local",
+      "session_id": "54df31d2",
+      "ground_truth": null,
+      "ai_response": "51G3Q",
+      "variant": {
+        "noise": 0,
+        "rotation": 0,
+        "overlap": 0,
+        "length": 5,
+        "font_size": 36,
+        "char_set": "alnum",
+        "bg_color": "#f0f0f0",
+        "fg_color": "#1a1a1a",
+        "wave": 0,
+        "occlusion": 0
+      },
+      "error_type": null
+    },
+    {
+      "type": "text",
+      "trial": 2,
+      "success": true,
+      "elapsed_s": 17.9,
+      "target": "local",
+      "session_id": "7165f614",
+      "ground_truth": null,
+      "ai_response": "GK7HC",
+      "variant": {
+        "noise": 0,
+        "rotation": 0,
+        "overlap": 0,
+        "length": 5,
+        "font_size": 36,
+        "char_set": "alnum",
+        "bg_color": "#f0f0f0",
+        "fg_color": "#1a1a1a",
+        "wave": 0,
+        "occlusion": 0
+      },
+      "error_type": null
+    },
+    {
+      "type": "text",
+      "trial": 3,
+      "success": true,
+      "elapsed_s": 17.9,
+      "target": "local",
+      "session_id": "24b65a7b",
+      "ground_truth": null,
+      "ai_response": "1GKJU",
+      "variant": {
+        "noise": 0,
+        "rotation": 0,
+        "overlap": 0,
+        "length": 5,
+        "font_size": 36,
+        "char_set": "alnum",
+        "bg_color": "#f0f0f0",
+        "fg_color": "#1a1a1a",
+        "wave": 0,
+        "occlusion": 0
+      },
+      "error_type": null
+    },
+    {
+      "type": "text",
+      "trial": 4,
+      "success": true,
+      "elapsed_s": 18.1,
+      "target": "local",
+      "session_id": "06c63644",
+      "ground_truth": null,
+      "ai_response": "V7OJX",
+      "variant": {
+        "noise": 0,
+        "rotation": 0,
+        "overlap": 0,
+        "length": 5,
+        "font_size": 36,
+        "char_set": "alnum",
+        "bg_color": "#f0f0f0",
+        "fg_color": "#1a1a1a",
+        "wave": 0,
+        "occlusion": 0
+      },
+      "error_type": null
+    },
+    {
+      "type": "text",
+      "trial": 5,
+      "success": true,
+      "elapsed_s": 17.8,
+      "target": "local",
+      "session_id": "c871c1a8",
+      "ground_truth": null,
+      "ai_response": "E0D18",
+      "variant": {
+        "noise": 0,
+        "rotation": 0,
+        "overlap": 0,
+        "length": 5,
+        "font_size": 36,
+        "char_set": "alnum",
+        "bg_color": "#f0f0f0",
+        "fg_color": "#1a1a1a",
+        "wave": 0,
+        "occlusion": 0
+      },
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 1,
+      "success": false,
+      "elapsed_s": 18.2,
+      "target": "local",
+      "session_id": "3a3191b9",
+      "ground_truth": null,
+      "ai_response": "6I1DVB",
+      "variant": {
+        "noise": 3,
+        "rotation": 25,
+        "overlap": 1,
+        "length": 6,
+        "font_size": 36,
+        "char_set": "mixed_case",
+        "bg_color": "#e8e8e8",
+        "fg_color": "#2a2a2a",
+        "wave": 2,
+        "occlusion": 2
+      },
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 2,
+      "success": false,
+      "elapsed_s": 18.2,
+      "target": "local",
+      "session_id": "c1879847",
+      "ground_truth": null,
+      "ai_response": "82qkv0",
+      "variant": {
+        "noise": 3,
+        "rotation": 25,
+        "overlap": 1,
+        "length": 6,
+        "font_size": 36,
+        "char_set": "mixed_case",
+        "bg_color": "#e8e8e8",
+        "fg_color": "#2a2a2a",
+        "wave": 2,
+        "occlusion": 2
+      },
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 3,
+      "success": true,
+      "elapsed_s": 18.0,
+      "target": "local",
+      "session_id": "a6af042d",
+      "ground_truth": null,
+      "ai_response": "COZJT0",
+      "variant": {
+        "noise": 3,
+        "rotation": 25,
+        "overlap": 1,
+        "length": 6,
+        "font_size": 36,
+        "char_set": "mixed_case",
+        "bg_color": "#e8e8e8",
+        "fg_color": "#2a2a2a",
+        "wave": 2,
+        "occlusion": 2
+      },
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 4,
+      "success": true,
+      "elapsed_s": 18.3,
+      "target": "local",
+      "session_id": "dd7793fd",
+      "ground_truth": null,
+      "ai_response": "SqPoVB",
+      "variant": {
+        "noise": 3,
+        "rotation": 25,
+        "overlap": 1,
+        "length": 6,
+        "font_size": 36,
+        "char_set": "mixed_case",
+        "bg_color": "#e8e8e8",
+        "fg_color": "#2a2a2a",
+        "wave": 2,
+        "occlusion": 2
+      },
+      "error_type": null
+    },
+    {
+      "type": "complicated_text",
+      "trial": 5,
+      "success": false,
+      "elapsed_s": 18.5,
+      "target": "local",
+      "session_id": "0fdf3c5d",
+      "ground_truth": null,
+      "ai_response": "7orczi",
+      "variant": {
+        "noise": 3,
+        "rotation": 25,
+        "overlap": 1,
+        "length": 6,
+        "font_size": 36,
+        "char_set": "mixed_case",
+        "bg_color": "#e8e8e8",
+        "fg_color": "#2a2a2a",
+        "wave": 2,
+        "occlusion": 2
+      },
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 1,
+      "success": true,
+      "elapsed_s": 21.8,
+      "target": "local",
+      "session_id": "2b6eb820",
+      "ground_truth": null,
+      "ai_response": [
+        0,
+        4,
+        7
+      ],
+      "variant": {
+        "target_kind": "shape",
+        "target_count": 3,
+        "distractor_mode": "random",
+        "noise": 0,
+        "tile_size": 80
+      },
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 2,
+      "success": true,
+      "elapsed_s": 19.5,
+      "target": "local",
+      "session_id": "83d684a1",
+      "ground_truth": null,
+      "ai_response": [
+        1,
+        2,
+        8
+      ],
+      "variant": {
+        "target_kind": "shape",
+        "target_count": 3,
+        "distractor_mode": "random",
+        "noise": 0,
+        "tile_size": 80
+      },
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 3,
+      "success": true,
+      "elapsed_s": 18.9,
+      "target": "local",
+      "session_id": "fee80061",
+      "ground_truth": null,
+      "ai_response": [
+        3,
+        4,
+        8
+      ],
+      "variant": {
+        "target_kind": "shape",
+        "target_count": 3,
+        "distractor_mode": "random",
+        "noise": 0,
+        "tile_size": 80
+      },
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 4,
+      "success": true,
+      "elapsed_s": 18.9,
+      "target": "local",
+      "session_id": "f3804733",
+      "ground_truth": null,
+      "ai_response": [
+        0,
+        2,
+        8
+      ],
+      "variant": {
+        "target_kind": "shape",
+        "target_count": 3,
+        "distractor_mode": "random",
+        "noise": 0,
+        "tile_size": 80
+      },
+      "error_type": null
+    },
+    {
+      "type": "recaptcha_v2",
+      "trial": 5,
+      "success": true,
+      "elapsed_s": 19.9,
+      "target": "local",
+      "session_id": "c6318dad",
+      "ground_truth": null,
+      "ai_response": [
+        3,
+        6,
+        8
+      ],
+      "variant": {
+        "target_kind": "shape",
+        "target_count": 3,
+        "distractor_mode": "random",
+        "noise": 0,
+        "tile_size": 80
+      },
+      "error_type": null
+    }
+  ]
+}

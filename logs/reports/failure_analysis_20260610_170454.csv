@@ -1,0 +1,15 @@
+axis,value,success,total,rate_pct
+char_set,alnum,20,30,66.67
+font_size,36,20,30,66.67
+length,5,20,30,66.67
+noise,0,3,5,60.0
+noise,2,17,25,68.0
+occlusion,4,1,5,20.0
+occlusion,1,3,5,60.0
+occlusion,0,4,5,80.0
+occlusion,3,4,5,80.0
+occlusion,2,5,5,100.0
+overlap,0,20,30,66.67
+rotation,0,3,5,60.0
+rotation,15,17,25,68.0
+wave,0,20,30,66.67
