@@ -73,22 +73,22 @@ Não é necessário passar `--target`. Todos os comandos abaixo continuam funcio
 
 ```bash
 # CAPTCHA de texto
-python main.py text --provider gemini --model gemini-2.5-flash
+python main.py text --provider openai --model gpt-4o-mini
 
 # CAPTCHA de texto complicado
-python main.py complicated_text --provider gemini --model gemini-2.5-flash
+python main.py complicated_text --provider openai --model gpt-4o-mini
 
 # reCAPTCHA v2
-python main.py recaptcha_v2 --provider gemini --model gemini-2.5-flash
+python main.py recaptcha_v2 --provider openai --model gpt-4o-mini
 
 # Puzzle (slider)
-python main.py puzzle --provider gemini --model gemini-2.5-flash
+python main.py puzzle --provider openai --model gpt-4o-mini
 
 # Áudio
-python main.py audio --provider gemini --model gemini-2.5-flash
+python main.py audio --provider openai --model gpt-4o-mini
 
 # Com documentação do raciocínio da IA (opcional)
-python main.py text --provider gemini --model gemini-2.5-flash --explain
+python main.py text --provider openai --model gpt-4o-mini --explain
 ```
 
 ### Modo local (CAPTCHAs customizados)
@@ -101,16 +101,16 @@ python captcha_server.py
 **Terminal 2** — rodar o bot contra o CAPTCHA local:
 ```bash
 # Texto simples (padrão, sem distorção)
-python main.py text --target local --provider gemini --model gemini-2.5-flash
+python main.py text --target local --provider openai --model gpt-4o-mini
 
 # Texto simples com parâmetros customizados
-python main.py text --target local --url "http://127.0.0.1:5000/text?noise=3&rotation=20&length=6&seed=42" --provider gemini --model gemini-2.5-flash
+python main.py text --target local --url "http://127.0.0.1:5000/text?noise=3&rotation=20&length=6&seed=42" --provider openai --model gpt-4o-mini
 
 # Texto distorcido (preset difícil: noise=3, rotation=25, occlusion=2, wave=2)
-python main.py complicated_text --target local --provider gemini --model gemini-2.5-flash
+python main.py complicated_text --target local --provider openai --model gpt-4o-mini
 
 # Texto distorcido com parâmetros customizados
-python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?noise=5&rotation=35&occlusion=3&seed=42" --provider gemini --model gemini-2.5-flash
+python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?noise=5&rotation=35&occlusion=3&seed=42" --provider openai --model gpt-4o-mini
 ```
 
 ## Como Funciona
@@ -157,15 +157,13 @@ O projeto registra automaticamente cada tentativa de resolução em `logs/solve_
 
 ### Raciocínio automático em falhas
 
-O raciocínio da IA é capturado em **toda** execução (segunda chamada à API por passo). O relatório `logs/reasoning_TIMESTAMP_TIPO.md` é gerado **automaticamente** sempre que o CAPTCHA falha — sem precisar de flags extras.
-
-A flag `--explain` força a geração do relatório também em casos de sucesso (útil para documentação acadêmica):
+O relatório `logs/reasoning_TIMESTAMP_TIPO.md` é gerado **automaticamente** sempre que o CAPTCHA falha. A flag `--explain` força a geração também em casos de sucesso:
 
 ```bash
-python main.py text --provider gemini --model gemini-2.5-flash --explain
+python main.py text --provider openai --model gpt-4o-mini --explain
 ```
 
-> **Nota:** Cada passo usa 2 chamadas à API (resposta + raciocínio). No reCAPTCHA v2, cada tile também gera uma chamada de raciocínio.
+> **Nota:** O raciocínio detalhado por passo está desativado por padrão para economizar quota de API. Para reativá-lo, restaure a chamada `explain_after_answer` em `ai_utils.py`.
 
 O projeto também salva GIFs de diagnóstico em `failed_solves/` quando a resolução falha, além dos GIFs de sucesso em `successful_solves/`.
 
@@ -211,9 +209,9 @@ http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42
 
 **Bot resolver o mesmo CAPTCHA:**
 ```bash
-python main.py text --target local --url "http://127.0.0.1:5000/text?noise=4&rotation=30&seed=42" --provider gemini --model gemini-2.5-flash
+python main.py text --target local --url "http://127.0.0.1:5000/text?noise=4&rotation=30&seed=42" --provider openai --model gpt-4o-mini
 
-python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42" --provider gemini --model gemini-2.5-flash
+python main.py complicated_text --target local --url "http://127.0.0.1:5000/complicated_text?occlusion=3&rotation=35&seed=42" --provider openai --model gpt-4o-mini
 ```
 
 ### 2. Bateria completa de testes (`run_tests.py`)
