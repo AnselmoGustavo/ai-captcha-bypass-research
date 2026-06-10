@@ -98,7 +98,10 @@ def finalize_session(success, details=None):
     if not should_report:
         _current_session = None
         return None
-    entries = get_session_entries()
+    entries = [
+        e for e in get_session_entries()
+        if (e.get("extra") or {}).get("step") != "start"
+    ]
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = os.path.join(
         LOG_DIR,
@@ -159,7 +162,7 @@ def log_attempt(captcha_type, provider, model, prompt, ai_response, success=None
         "provider": provider,
         "model": model,
         "prompt": prompt[:500] if prompt else None,
-        "ai_response": str(ai_response),
+        "ai_response": str(ai_response) if ai_response is not None else None,
         "reasoning": reasoning,
         "success": success,
         "extra": extra,
@@ -197,12 +200,20 @@ def log_result(success, captcha_type=None, details=None):
             entry["extra"]["result_details"] = details
         updated = True
 
-    if not updated and logs:
-        logs[-1]["success"] = success
-        if details:
-            if logs[-1].get("extra") is None:
-                logs[-1]["extra"] = {}
-            logs[-1]["extra"]["result_details"] = details
+    if not updated:
+        # No entries for this session yet — create one so the session is always recorded
+        logs.append({
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(),
+            "captcha_type": (_current_session or {}).get("captcha_type") or captcha_type,
+            "provider": (_current_session or {}).get("provider"),
+            "model": (_current_session or {}).get("model"),
+            "prompt": None,
+            "ai_response": None,
+            "reasoning": None,
+            "success": success,
+            "extra": {"result_details": details} if details else None,
+        })
 
     with open(LOG_FILE, "w", encoding="utf-8") as f:
         json.dump(logs, f, ensure_ascii=False, indent=2)

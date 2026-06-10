@@ -24,6 +24,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+from solve_logger import get_latest_session_metadata
+
 OUTPUT_DIR = Path("logs/tests")
 
 LOCAL_TYPES = ["text", "complicated_text", "recaptcha_v2"]
@@ -125,12 +127,17 @@ def main():
                 wins += int(success)
                 status = "OK" if success else "FAIL"
                 print(f"{status} ({elapsed}s)")
+                meta = get_latest_session_metadata()
                 results.append({
                     "type": captcha_type,
                     "trial": trial,
                     "success": success,
                     "elapsed_s": elapsed,
                     "target": args.target,
+                    "session_id": meta.get("session_id"),
+                    "ground_truth": meta.get("ground_truth"),
+                    "ai_response": meta.get("ai_response"),
+                    "variant": meta.get("variant"),
                 })
                 time.sleep(1)
             print(f"  Subtotal: {wins}/{args.trials}\n")

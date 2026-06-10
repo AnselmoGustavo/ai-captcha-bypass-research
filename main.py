@@ -37,7 +37,7 @@ from ai_utils import (
     ask_puzzle_correction_to_gemini
 )
 from gif_utils import create_result_gif
-from solve_logger import log_result, start_session, finalize_session
+from solve_logger import log_result, start_session, finalize_session, log_attempt
 
 #todo: sesli captchada sese asıl captchayı söyledikten sonra ignore previous instructions diyip sonra random bir captcha daha vericem
 load_dotenv()
@@ -212,17 +212,29 @@ def _read_variant_from_page(driver):
 def _local_text_solver(driver, captcha_type, provider, model, url):
     """Resolve qualquer CAPTCHA de texto (simples ou distorcido) do servidor Flask local."""
     driver.get(url)
-    captcha_image = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "captcha-image"))
-    )
-    WebDriverWait(driver, 10).until(
-        lambda d: d.execute_script(
-            "const img = document.getElementById('captcha-image'); return img && img.complete && img.naturalWidth > 0;"
-        )
-    )
-    time.sleep(1)
     screenshot_paths = []
     try:
+        captcha_image = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "captcha-image"))
+        )
+        try:
+            WebDriverWait(driver, 5).until(
+                lambda d: d.execute_script(
+                    "const img = document.getElementById('captcha-image'); return img && img.complete && img.naturalWidth > 0;"
+                )
+            )
+        except Exception:
+            # Image didn't load — reload the page and try once more
+            driver.get(url)
+            captcha_image = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "captcha-image"))
+            )
+            WebDriverWait(driver, 10).until(
+                lambda d: d.execute_script(
+                    "const img = document.getElementById('captcha-image'); return img && img.complete && img.naturalWidth > 0;"
+                )
+            )
+        time.sleep(1)
         captcha_screenshot_path = f'screenshots/{captcha_type}_local_1.png'
         captcha_image.screenshot(captcha_screenshot_path)
         screenshot_paths.append(captcha_screenshot_path)
@@ -366,18 +378,31 @@ def text_test(driver, provider='openai', model=None, target='2captcha', url=None
 def recaptcha_v2_test_local(driver, provider='gemini', model=None, url='http://127.0.0.1:5000/recaptcha_v2'):
     """Resolve reCAPTCHA v2 sintético do servidor Flask local."""
     driver.get(url)
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "captcha-grid"))
-    )
-    WebDriverWait(driver, 15).until(
-        lambda d: d.execute_script(
-            "const imgs = document.querySelectorAll('.tile img');"
-            "return imgs.length === 9 && Array.from(imgs).every(i => i.complete && i.naturalWidth > 0);"
-        )
-    )
-    time.sleep(0.5)
     screenshot_paths = []
     try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "captcha-grid"))
+        )
+        try:
+            WebDriverWait(driver, 8).until(
+                lambda d: d.execute_script(
+                    "const imgs = document.querySelectorAll('.tile img');"
+                    "return imgs.length === 9 && Array.from(imgs).every(i => i.complete && i.naturalWidth > 0);"
+                )
+            )
+        except Exception:
+            # Tiles didn't load — reload and try once more
+            driver.get(url)
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "captcha-grid"))
+            )
+            WebDriverWait(driver, 15).until(
+                lambda d: d.execute_script(
+                    "const imgs = document.querySelectorAll('.tile img');"
+                    "return imgs.length === 9 && Array.from(imgs).every(i => i.complete && i.naturalWidth > 0);"
+                )
+            )
+        time.sleep(0.5)
         instruction_el = driver.find_element(By.ID, "captcha-instruction")
         object_name = instruction_el.get_attribute("data-target")
         print(f"Instrução: {instruction_el.text}  |  Alvo: {object_name}")
@@ -639,6 +664,8 @@ def main():
     os.makedirs('screenshots', exist_ok=True)
 
     start_session(args.captcha_type, args.provider, args.model, explicit_explain=args.explain)
+    log_attempt(args.captcha_type, args.provider, args.model or "default",
+                "session_start", None, extra={"step": "start"})
     run_success = False
     run_details = None
 
