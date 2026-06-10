@@ -233,6 +233,8 @@ def _classify_error(error_str):
         return "api_unavailable"
     if "timeout" in s.lower() or "timed out" in s.lower():
         return "api_timeout"
+    if "API_KEY_INVALID" in s or "API key not valid" in s:
+        return "api_key_invalid"
     return None
 
 

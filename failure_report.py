@@ -233,6 +233,7 @@ def write_markdown(report_path, experiment, by_name, by_axis, response_analysis,
             "api_quota":       "Cota da API esgotada (429 RESOURCE_EXHAUSTED)",
             "api_unavailable": "API indisponível (503/502)",
             "api_timeout":     "Timeout da API",
+            "api_key_invalid": "API key inválida (400 INVALID_ARGUMENT)",
         }
         counts = Counter(r["error_type"] for r in api_error_results)
         lines.extend([
