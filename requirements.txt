@@ -41,3 +41,4 @@ google-genai
 Pillow==10.4.0
 pynput
 flask
+matplotlib

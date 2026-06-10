@@ -132,6 +132,7 @@ python main.py complicated_text --target local --url "http://127.0.0.1:5000/comp
 - `run_tests.py` — Bateria completa por tipo de CAPTCHA (tabela de taxa de sucesso)
 - `run_experiments.py` — Sweep de um parâmetro por vez (`--captcha-type text|complicated_text`, `--sweep <nome>`)
 - `failure_report.py` — Relatório de taxa de falha por parâmetro
+- `plot_results.py` — Gera gráficos PNG a partir dos logs (taxa de sucesso, tempo)
 - `experiments/text_variants.json` — Matriz de variantes para experimentos
 - `ai_utils.py` — Interação com APIs de IA (OpenAI e Gemini), definição de prompts
 - `puzzle_solver.py` — Lógica específica para resolver CAPTCHA de slider/puzzle
@@ -263,7 +264,31 @@ Saída:
 
 O relatório lista as **variantes com menor taxa de sucesso**, indicando onde a IA é mais vulnerável (ex.: `rotation=30` derruba a taxa).
 
-### 4. Editar variantes de experimento
+### 4. Gerar gráficos (`plot_results.py`)
+
+Gera gráficos PNG em `logs/charts/` a partir dos JSONs de teste ou experimento:
+
+```bash
+# De um test run (run_tests.py)
+python plot_results.py --experiment logs/tests/test_TIMESTAMP.json
+
+# De um sweep (run_experiments.py)
+python plot_results.py --experiment logs/experiments/run_TIMESTAMP.json
+
+# Processar todos os JSONs de uma vez
+python plot_results.py --all
+```
+
+**Gráficos gerados por tipo de arquivo:**
+
+| Arquivo | Gráficos |
+|---------|---------|
+| `logs/tests/*.json` | Barras: taxa de sucesso por tipo de CAPTCHA + box plot de tempo |
+| `logs/experiments/*.json` | Barras por eixo de parâmetro + linha do sweep variado |
+
+Os gráficos usam cores semânticas: verde ≥ 70%, amarelo ≥ 40%, vermelho < 40%.
+
+### 5. Editar variantes de experimento
 
 Sweeps disponíveis em `experiments/text_variants.json`: `noise_sweep`, `rotation_sweep`, `overlap_sweep`, `length_sweep`, `occlusion_sweep`.
 
