@@ -23,14 +23,7 @@ def image_to_base64(image_path):
 
 def _log_with_reasoning(captcha_type, provider, model, prompt, result, media_path=None,
                         media_type="image", task_desc=None, extra=None):
-    reasoning = None
-    if is_reasoning_enabled() and media_path and os.path.exists(media_path):
-        from reasoning_utils import explain_after_answer
-        reasoning = explain_after_answer(
-            provider, model, media_path, media_type,
-            task_desc or captcha_type, str(result),
-        )
-    log_attempt(captcha_type, provider, model, prompt, result, reasoning=reasoning, extra=extra)
+    log_attempt(captcha_type, provider, model, prompt, result, reasoning=None, extra=extra)
 
 
 # --- OpenAI Functions ---

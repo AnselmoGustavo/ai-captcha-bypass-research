@@ -57,14 +57,14 @@ def average_of_array(arr):
 def check_tile_for_object(args):
     """Helper function for ThreadPoolExecutor to call the correct AI provider for a single tile."""
     tile_index, tile_path, object_name, provider, model = args
-    
+
     try:
         decision_str = ''
         if provider == 'openai':
             decision_str = ask_if_tile_contains_object_chatgpt(tile_path, object_name, model)
         else: # gemini
             decision_str = ask_if_tile_contains_object_gemini(tile_path, object_name, model)
-        
+
         print(f"Tile {tile_index}: Does it contain '{object_name}'? AI says: {decision_str}")
         return tile_index, decision_str == 'true'
     except Exception as e:
