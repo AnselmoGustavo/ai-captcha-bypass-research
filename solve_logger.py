@@ -264,6 +264,8 @@ def get_latest_session_metadata():
             ai_response = details.get("ai_response") or ai_response
             if details.get("error") and error_type is None:
                 error_type = _classify_error(str(details["error"]))
+        elif isinstance(details, str) and error_type is None:
+            error_type = _classify_error(details)
         if entry.get("success") is not None:
             success = entry.get("success")
 
