@@ -222,6 +222,20 @@ def log_result(success, captcha_type=None, details=None):
     print(f"[LOG] Resultado: {status}")
 
 
+def _classify_error(error_str):
+    """Classifica o tipo de erro a partir da mensagem de exceção."""
+    if not error_str:
+        return None
+    s = str(error_str)
+    if "429" in s or "RESOURCE_EXHAUSTED" in s:
+        return "api_quota"
+    if "503" in s or "502" in s or "SERVICE_UNAVAILABLE" in s:
+        return "api_unavailable"
+    if "timeout" in s.lower() or "timed out" in s.lower():
+        return "api_timeout"
+    return None
+
+
 def get_latest_session_metadata():
     """Retorna metadados da sessão mais recente em solve_log.json."""
     _ensure_log_file()
@@ -236,6 +250,7 @@ def get_latest_session_metadata():
     ground_truth = None
     variant = None
     success = None
+    error_type = None
 
     for entry in session_logs:
         if entry.get("ai_response"):
@@ -245,6 +260,8 @@ def get_latest_session_metadata():
             ground_truth = details.get("ground_truth") or ground_truth
             variant = details.get("variant") or variant
             ai_response = details.get("ai_response") or ai_response
+            if details.get("error") and error_type is None:
+                error_type = _classify_error(str(details["error"]))
         if entry.get("success") is not None:
             success = entry.get("success")
 
@@ -254,6 +271,7 @@ def get_latest_session_metadata():
         "ground_truth": ground_truth,
         "variant": variant,
         "success": success,
+        "error_type": error_type,
     }
 
 

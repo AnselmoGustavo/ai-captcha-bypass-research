@@ -59,22 +59,30 @@ def run_trial(captcha_type, provider, model, target, url=None):
 
 
 def print_summary(results, types_run):
-    print("\n" + "=" * 50)
-    print(f"{'Tipo':<25} {'Resultado':>10} {'Taxa':>8}")
-    print("-" * 50)
+    print("\n" + "=" * 58)
+    print(f"{'Tipo':<25} {'Resultado':>10} {'Taxa':>8} {'API err':>8}")
+    print("-" * 58)
     total_wins = 0
     total_runs = 0
+    total_api  = 0
     for ct in types_run:
         ct_results = [r for r in results if r["type"] == ct]
-        wins = sum(1 for r in ct_results if r["success"])
-        total = len(ct_results)
-        rate = f"{wins / total * 100:.0f}%" if total else "—"
+        wins      = sum(1 for r in ct_results if r["success"])
+        total     = len(ct_results)
+        api_errs  = sum(1 for r in ct_results if r.get("error_type"))
+        effective = total - api_errs
+        rate      = f"{wins / effective * 100:.0f}%" if effective else "—"
+        api_col   = str(api_errs) if api_errs else ""
         total_wins += wins
         total_runs += total
-        print(f"{ct:<25} {wins:>4}/{total:<5} {rate:>8}")
-    print("=" * 50)
-    overall = f"{total_wins / total_runs * 100:.0f}%" if total_runs else "—"
-    print(f"{'TOTAL':<25} {total_wins:>4}/{total_runs:<5} {overall:>8}")
+        total_api  += api_errs
+        print(f"{ct:<25} {wins:>4}/{effective:<5} {rate:>8} {api_col:>8}")
+    print("=" * 58)
+    total_effective = total_runs - total_api
+    overall = f"{total_wins / total_effective * 100:.0f}%" if total_effective else "—"
+    print(f"{'TOTAL':<25} {total_wins:>4}/{total_effective:<5} {overall:>8} {total_api:>8}")
+    if total_api:
+        print(f"\n  ★ {total_api} trial(s) excluído(s) por erro de API (quota/503/timeout)")
     print()
 
 
@@ -138,6 +146,7 @@ def main():
                     "ground_truth": meta.get("ground_truth"),
                     "ai_response": meta.get("ai_response"),
                     "variant": meta.get("variant"),
+                    "error_type": meta.get("error_type"),
                 })
                 time.sleep(1)
             print(f"  Subtotal: {wins}/{args.trials}\n")

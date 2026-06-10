@@ -8,7 +8,7 @@ Uso:
 import argparse
 import csv
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 CONFUSION_HINTS = {
@@ -53,11 +53,13 @@ def collect_failure_reasoning(results, solve_log):
 
 def aggregate_by_type(results):
     """Agrega resultados por tipo de CAPTCHA (para runs do run_tests.py)."""
-    by_type = defaultdict(lambda: {"success": 0, "total": 0})
+    by_type = defaultdict(lambda: {"success": 0, "total": 0, "api_errors": 0})
     for r in results:
         t = r.get("type") or r.get("captcha_type") or "unknown"
         by_type[t]["total"] += 1
-        if r.get("success"):
+        if r.get("error_type"):
+            by_type[t]["api_errors"] += 1
+        elif r.get("success"):
             by_type[t]["success"] += 1
     return dict(by_type)
 
@@ -121,25 +123,28 @@ def character_confusions(ground_truth, ai_response):
 
 
 def aggregate_by_axis(results):
-    by_axis = defaultdict(lambda: defaultdict(lambda: {"success": 0, "total": 0}))
+    by_axis = defaultdict(lambda: defaultdict(lambda: {"success": 0, "total": 0, "api_errors": 0}))
     for r in results:
         params = r.get("variant_params", {})
-        success = r.get("success", False)
         for axis, value in params.items():
             if axis in ("name", "sweep", "vary", "value", "seed"):
                 continue
             by_axis[axis][str(value)]["total"] += 1
-            if success:
+            if r.get("error_type"):
+                by_axis[axis][str(value)]["api_errors"] += 1
+            elif r.get("success", False):
                 by_axis[axis][str(value)]["success"] += 1
     return by_axis
 
 
 def aggregate_by_variant_name(results):
-    by_name = defaultdict(lambda: {"success": 0, "total": 0})
+    by_name = defaultdict(lambda: {"success": 0, "total": 0, "api_errors": 0})
     for r in results:
         name = r.get("variant_name", "unknown")
         by_name[name]["total"] += 1
-        if r.get("success"):
+        if r.get("error_type"):
+            by_name[name]["api_errors"] += 1
+        elif r.get("success"):
             by_name[name]["success"] += 1
     return by_name
 
@@ -174,9 +179,10 @@ def analyze_responses(results):
 
 
 def success_rate(stats):
-    if stats["total"] == 0:
+    effective = stats["total"] - stats.get("api_errors", 0)
+    if effective == 0:
         return 0.0
-    return 100.0 * stats["success"] / stats["total"]
+    return 100.0 * stats["success"] / effective
 
 
 def top_weak_axes(by_axis, n=3):
@@ -184,61 +190,113 @@ def top_weak_axes(by_axis, n=3):
     for axis, values in by_axis.items():
         if not values:
             continue
-        worst = min(values.items(), key=lambda x: success_rate(x[1]))
-        axis_worst.append((axis, worst[0], success_rate(worst[1]), worst[1]["total"]))
+        # ignora valores onde todos os trials foram erro de API
+        effective_values = {v: s for v, s in values.items()
+                            if (s["total"] - s.get("api_errors", 0)) > 0}
+        if not effective_values:
+            continue
+        worst = min(effective_values.items(), key=lambda x: success_rate(x[1]))
+        effective_n = worst[1]["total"] - worst[1].get("api_errors", 0)
+        axis_worst.append((axis, worst[0], success_rate(worst[1]), effective_n))
     axis_worst.sort(key=lambda x: x[2])
     return axis_worst[:n]
+
+
+def _api_note(stats):
+    """Retorna string '(+N API)' quando há erros de API, ou '' quando não há."""
+    n = stats.get("api_errors", 0)
+    return f" (+{n} API)" if n else ""
 
 
 def write_markdown(report_path, experiment, by_name, by_axis, response_analysis,
                    by_type=None, grid_analysis=None, failure_reasoning=None):
     results = experiment["results"]
     total = len(results)
+    api_error_results = [r for r in results if r.get("error_type")]
     wins = sum(1 for r in results if r.get("success"))
+    effective_total = total - len(api_error_results)
+    overall_stats = {"success": wins, "total": total, "api_errors": len(api_error_results)}
+
     lines = [
         "# Relatório de Falhas da IA",
         "",
         f"- **Run ID:** {experiment.get('run_id', 'N/A')}",
         f"- **Provider:** {experiment.get('provider')} / {experiment.get('model')}",
-        f"- **Taxa geral:** {wins}/{total} ({success_rate({'success': wins, 'total': total}):.1f}%)",
+        f"- **Taxa geral:** {wins}/{effective_total} ({success_rate(overall_stats):.1f}%)"
+        + (f" — _{len(api_error_results)} trial(s) excluídos por erro de API_" if api_error_results else ""),
         "",
     ]
 
+    # Aviso de erros de API
+    if api_error_results:
+        error_labels = {
+            "api_quota":       "Cota da API esgotada (429 RESOURCE_EXHAUSTED)",
+            "api_unavailable": "API indisponível (503/502)",
+            "api_timeout":     "Timeout da API",
+        }
+        counts = Counter(r["error_type"] for r in api_error_results)
+        lines.extend([
+            "> **Aviso:** Trials inválidos por erro de API foram excluídos das taxas de sucesso abaixo.",
+            "> As taxas refletem apenas tentativas onde o bot chegou a interagir com o CAPTCHA.",
+            ">",
+        ])
+        for etype, count in sorted(counts.items()):
+            label = error_labels.get(etype, etype)
+            lines.append(f"> - **{label}:** {count} trial(s)")
+        lines.append("")
+
     # Por tipo (run_tests.py)
     if by_type:
-        lines.extend(["## Por tipo de CAPTCHA", "",
-                       "| Tipo | Sucesso | Total | Taxa |",
-                       "|------|---------|-------|------|"])
+        has_api = any(s.get("api_errors") for s in by_type.values())
+        header = "| Tipo | Sucesso | Efetivos | Taxa |" + (" API erros |" if has_api else "")
+        sep    = "|------|---------|----------|------|" + ("-----------|" if has_api else "")
+        lines.extend(["## Por tipo de CAPTCHA", "", header, sep])
         for t, stats in sorted(by_type.items(), key=lambda x: success_rate(x[1])):
-            lines.append(f"| {t} | {stats['success']} | {stats['total']} | {success_rate(stats):.1f}% |")
+            effective = stats["total"] - stats.get("api_errors", 0)
+            row = f"| {t} | {stats['success']} | {effective} | {success_rate(stats):.1f}% |"
+            if has_api:
+                row += f" {stats.get('api_errors', 0)} |"
+            lines.append(row)
         lines.append("")
 
     # Por variante (run_experiments.py)
     if by_name:
-        lines.extend(["## Por variante", "",
-                       "| Variante | Sucesso | Total | Taxa |",
-                       "|----------|---------|-------|------|"])
+        has_api = any(s.get("api_errors") for s in by_name.values())
+        header = "| Variante | Sucesso | Efetivos | Taxa |" + (" API erros |" if has_api else "")
+        sep    = "|----------|---------|----------|------|" + ("-----------|" if has_api else "")
+        lines.extend(["## Por variante", "", header, sep])
         for name, stats in sorted(by_name.items(), key=lambda x: success_rate(x[1])):
-            lines.append(f"| {name} | {stats['success']} | {stats['total']} | {success_rate(stats):.1f}% |")
+            effective = stats["total"] - stats.get("api_errors", 0)
+            row = f"| {name} | {stats['success']} | {effective} | {success_rate(stats):.1f}% |"
+            if has_api:
+                row += f" {stats.get('api_errors', 0)} |"
+            lines.append(row)
 
     for axis, values in sorted(by_axis.items()):
-        lines.extend(["", f"## Eixo: `{axis}`", "",
-                       "| Valor | Sucesso | Total | Taxa |",
-                       "|-------|---------|-------|------|"])
+        has_api = any(s.get("api_errors") for s in values.values())
+        header = "| Valor | Sucesso | Efetivos | Taxa |" + (" API erros |" if has_api else "")
+        sep    = "|-------|---------|----------|------|" + ("-----------|" if has_api else "")
+        lines.extend(["", f"## Eixo: `{axis}`", "", header, sep])
         for value, stats in sorted(values.items(), key=lambda x: success_rate(x[1])):
-            lines.append(f"| {value} | {stats['success']} | {stats['total']} | {success_rate(stats):.1f}% |")
+            effective = stats["total"] - stats.get("api_errors", 0)
+            row = f"| {value} | {stats['success']} | {effective} | {success_rate(stats):.1f}% |"
+            if has_api:
+                row += f" {stats.get('api_errors', 0)} |"
+            lines.append(row)
 
     if by_name:
         weakest = sorted(by_name.items(), key=lambda x: success_rate(x[1]))[:3]
         lines.extend(["", "## Top 3 variantes com mais falha", ""])
         for name, stats in weakest:
-            lines.append(f"- **{name}:** {success_rate(stats):.1f}% de sucesso")
+            effective = stats["total"] - stats.get("api_errors", 0)
+            note = _api_note(stats)
+            lines.append(f"- **{name}:** {success_rate(stats):.1f}% de sucesso ({effective} efetivos{note})")
 
     if by_axis:
         weak_axes = top_weak_axes(by_axis, 3)
         lines.extend(["", "## Top 3 eixos de parâmetro mais fracos", ""])
         for axis, value, rate, n in weak_axes:
-            lines.append(f"- **`{axis}={value}`:** {rate:.1f}% de sucesso ({n} tentativas)")
+            lines.append(f"- **`{axis}={value}`:** {rate:.1f}% de sucesso ({n} tentativas efetivas)")
 
     # Análise de texto (distância de edição, confusões)
     ra = response_analysis

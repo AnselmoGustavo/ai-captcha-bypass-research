@@ -150,6 +150,7 @@ def main():
                     "ai_response": meta.get("ai_response"),
                     "variant": meta.get("variant"),
                     "session_id": meta.get("session_id"),
+                    "error_type": meta.get("error_type"),
                 })
                 time.sleep(1)
 
